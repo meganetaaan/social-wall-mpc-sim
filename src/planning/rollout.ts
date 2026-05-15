@@ -45,6 +45,7 @@ export function rolloutCandidate(args: {
   let humans = args.humans
   let belief = args.belief
   let previousControl = args.previousControl
+  let rolloutTime = 0
   let cost = zeroCost()
 
   for (const control of args.controls) {
@@ -59,7 +60,8 @@ export function rolloutCandidate(args: {
     })
     cost = addCost(cost, stage)
     robot = stepRobot(robot, control, args.parameters.dt)
-    humans = predictHumans(humans, args.parameters.dt)
+    humans = predictHumans(humans, args.parameters.dt, undefined, robot, rolloutTime)
+    rolloutTime += args.parameters.dt
     belief = updateBelief(belief, robot, args.environment, args.parameters)
     trajectory.push(robot)
     predictedHumans.push(humans)

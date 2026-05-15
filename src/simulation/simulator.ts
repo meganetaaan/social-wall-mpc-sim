@@ -13,7 +13,7 @@ export function stepSimulation(
 ): SimulationState {
   const plan = planWithPolicy({ mode: plannerMode, state, parameters, seed: seed + Math.floor(state.time * 1000) })
   const robot = stepRobot(state.robot, plan.bestControl, parameters.dt)
-  const humans = predictHumans(state.humans, parameters.dt)
+  const humans = predictHumans(state.humans, parameters.dt, undefined, robot, state.time)
   const belief = updateBelief(state.belief, robot, state.environment, parameters, state.time + parameters.dt)
   const currentObservations = observeWalls(robot, state.environment, parameters)
   const trace = [...state.trace, { x: robot.x, y: robot.y }].slice(-650)

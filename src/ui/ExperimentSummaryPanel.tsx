@@ -11,7 +11,14 @@ type Props = {
   parameters: PlannerParameters
 }
 
-const uiScenarioIds: ScenarioId[] = ['crossing-human', 'standing-human', 'blocked-corridor']
+const uiScenarioIds: ScenarioId[] = [
+  'crossing-human',
+  'follow-behind-human',
+  'overtaking-human',
+  'yielding-blocker',
+  'spiral-known',
+  'spiral-unknown',
+]
 const uiPlannerModes: PlannerMode[] = ['belief-mpc', 'wall-only', 'reactive-stop']
 const uiMaxSteps = 240
 

@@ -16,6 +16,11 @@ export type ScenarioId =
   | 'blocked-corridor'
   | 'partial-map-bend'
   | 'multi-human'
+  | 'follow-behind-human'
+  | 'overtaking-human'
+  | 'yielding-blocker'
+  | 'spiral-known'
+  | 'spiral-unknown'
 
 export type ScenarioDefinition = {
   id: ScenarioId
@@ -85,6 +90,62 @@ const scenarioBelief = (environment: Environment, firstWallCoverage = { tMin: 0.
   })),
 })
 
+const knownMapBelief = (environment: Environment): BeliefState => ({
+  sigmaX: 0.08,
+  sigmaY: 0.08,
+  sigmaTheta: 0.03,
+  mapConfidence: 0.86,
+  wallBeliefs: environment.walls.map((wall) => ({ wallId: wall.id, confidence: 0.88, lastObservedAt: 0 })),
+  estimatedWalls: environment.walls.map((wall) => ({
+    wallId: wall.id,
+    tMin: 0,
+    tMax: 1,
+    confidence: 0.88,
+    lastObservedAt: 0,
+  })),
+})
+
+const unknownMapBelief = (environment: Environment): BeliefState => ({
+  sigmaX: 0.18,
+  sigmaY: 0.18,
+  sigmaTheta: 0.08,
+  mapConfidence: 0.12,
+  wallBeliefs: environment.walls.map((wall, index) => ({
+    wallId: wall.id,
+    confidence: index === 0 ? 0.32 : 0.04,
+    lastObservedAt: index === 0 ? 0 : -1,
+  })),
+  estimatedWalls: environment.walls.map((wall, index) => ({
+    wallId: wall.id,
+    tMin: index === 0 ? 0.08 : 0,
+    tMax: index === 0 ? 0.22 : 0,
+    confidence: index === 0 ? 0.32 : 0,
+    lastObservedAt: index === 0 ? 0 : -1,
+  })),
+})
+
+const spiralEnvironment: Environment = {
+  goal: { x: 5.0, y: 2.5 },
+  goalRadius: 0.24,
+  walls: [
+    { id: 'spiral-outer-bottom', a: { x: 0.35, y: 0.35 }, b: { x: 9.45, y: 0.35 } },
+    { id: 'spiral-outer-right', a: { x: 9.45, y: 0.35 }, b: { x: 9.45, y: 4.65 } },
+    { id: 'spiral-outer-top', a: { x: 9.45, y: 4.65 }, b: { x: 0.35, y: 4.65 } },
+    { id: 'spiral-outer-left', a: { x: 0.35, y: 4.65 }, b: { x: 0.35, y: 1.05 } },
+    { id: 'spiral-entry-left-lip', a: { x: 0.35, y: 1.05 }, b: { x: 1.25, y: 1.05 } },
+    { id: 'spiral-lane-bottom', a: { x: 1.25, y: 1.05 }, b: { x: 8.35, y: 1.05 } },
+    { id: 'spiral-lane-right', a: { x: 8.35, y: 1.05 }, b: { x: 8.35, y: 3.95 } },
+    { id: 'spiral-lane-top', a: { x: 8.35, y: 3.95 }, b: { x: 1.65, y: 3.95 } },
+    { id: 'spiral-lane-left', a: { x: 1.65, y: 3.95 }, b: { x: 1.65, y: 1.75 } },
+    { id: 'spiral-inner-bottom', a: { x: 1.65, y: 1.75 }, b: { x: 7.25, y: 1.75 } },
+    { id: 'spiral-inner-right', a: { x: 7.25, y: 1.75 }, b: { x: 7.25, y: 3.25 } },
+    { id: 'spiral-inner-top', a: { x: 7.25, y: 3.25 }, b: { x: 2.55, y: 3.25 } },
+    { id: 'spiral-inner-left', a: { x: 2.55, y: 3.25 }, b: { x: 2.55, y: 2.35 } },
+    { id: 'spiral-center-bottom', a: { x: 2.55, y: 2.35 }, b: { x: 5.0, y: 2.35 } },
+  ],
+  obstacles: [],
+}
+
 export const scenarioDefinitions: ScenarioDefinition[] = [
   {
     id: 'crossing-human',
@@ -150,6 +211,91 @@ export const scenarioDefinitions: ScenarioDefinition[] = [
       { id: 'slow-near-wall', x: 7.0, y: 1.12, vx: -0.03, vy: 0, radius: 0.23 },
     ],
     environment: baseEnvironment,
+  },
+  {
+    id: 'follow-behind-human',
+    name: 'Followed from behind',
+    description: 'A person appears behind the robot and keeps following at a close but moving social distance.',
+    seed: 411,
+    initialRobot: { x: 1.25, y: 0.86, theta: 0 },
+    humans: [
+      {
+        id: 'following-human',
+        x: 0.65,
+        y: 0.95,
+        vx: 0,
+        vy: 0,
+        radius: 0.23,
+        motion: { kind: 'follow-robot', distanceBehind: 0.85, lateralOffset: 0.04, speed: 0.36 },
+      },
+    ],
+    environment: baseEnvironment,
+  },
+  {
+    id: 'overtaking-human',
+    name: 'Overtaking human',
+    description: 'A faster person starts behind the robot, passes on the outside, and merges ahead in the corridor.',
+    seed: 512,
+    initialRobot: { x: 1.15, y: 0.86, theta: 0 },
+    humans: [
+      {
+        id: 'overtaking-human',
+        x: 0.75,
+        y: 1.2,
+        vx: 0,
+        vy: 0,
+        radius: 0.23,
+        motion: {
+          kind: 'scripted',
+          waypoints: [
+            { at: 0, x: 0.75, y: 1.2 },
+            { at: 4, x: 2.8, y: 1.55 },
+            { at: 8, x: 5.2, y: 1.28 },
+            { at: 14, x: 7.4, y: 1.1 },
+          ],
+        },
+      },
+    ],
+    environment: baseEnvironment,
+  },
+  {
+    id: 'yielding-blocker',
+    name: 'Yielding blocker',
+    description: 'A person blocks the wall corridor at first, then steps aside so the robot can resume.',
+    seed: 613,
+    initialRobot: { x: 1.0, y: 0.86, theta: 0 },
+    humans: [
+      {
+        id: 'yielding-blocker',
+        x: 2.15,
+        y: 0.88,
+        vx: 0,
+        vy: 0,
+        radius: 0.3,
+        motion: { kind: 'yield-after', yieldAt: 5.5, target: { x: 2.25, y: 1.75 }, speed: 0.36 },
+      },
+    ],
+    environment: baseEnvironment,
+  },
+  {
+    id: 'spiral-known',
+    name: 'Spiral corridor known map',
+    description: 'A rectangular spiral corridor with the goal in the center and most walls already known in belief.',
+    seed: 714,
+    initialRobot: { x: 0.85, y: 0.82, theta: 0 },
+    humans: [{ id: 'spiral-slow-human', x: 4.4, y: 1.08, vx: 0.04, vy: 0, radius: 0.23 }],
+    environment: spiralEnvironment,
+    initialBelief: knownMapBelief,
+  },
+  {
+    id: 'spiral-unknown',
+    name: 'Spiral corridor unknown map',
+    description: 'The same center-goal spiral, but only the entry wall is initially believed with low confidence.',
+    seed: 815,
+    initialRobot: { x: 0.85, y: 0.82, theta: 0 },
+    humans: [{ id: 'spiral-crossing-human', x: 4.2, y: 3.25, vx: 0.06, vy: -0.04, radius: 0.23 }],
+    environment: spiralEnvironment,
+    initialBelief: unknownMapBelief,
   },
 ]
 

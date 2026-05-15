@@ -75,6 +75,11 @@ The scenario selector resets the simulator into deterministic, named experiment 
 - **Blocked corridor**: a near-wall blockage makes stopping useful for several steps.
 - **Partial-map bend**: a bent and alcove-like wall layout where estimated wall coverage matters.
 - **Multi-human**: multiple people create competing social costs.
+- **Followed from behind**: a person comes from behind and keeps tracking the robot, testing rear social pressure rather than only frontal obstacles.
+- **Overtaking human**: a faster scripted person passes the robot on the outside and merges ahead.
+- **Yielding blocker**: a person initially blocks the corridor, then steps aside after a delay so the unified objective can move from stop/yield back to wall following.
+- **Spiral corridor known map**: a rectangular spiral corridor with the goal at the center and high initial wall-map confidence.
+- **Spiral corridor unknown map**: the same center-goal spiral, but only the entry wall starts with low confidence so observation gain and map uncertainty matter more.
 
 Scenarios are defined in `src/simulation/scenarios.ts` and instantiate only simulation state: robot pose, humans, environment, and initial belief. Rendering does not contain scenario logic.
 
@@ -92,7 +97,7 @@ The baselines are comparison tools, not alternative proposed methods. They inten
 
 The app includes a **Run comparison** button below the live metric panel. It runs deterministic headless replays in the browser with the same `stepSimulation` code used by the canvas animation, then shows one row per scenario and policy. The table is meant for quick side-by-side checks: lower social violations and near collisions are better, lower best goal distance means the robot got closer to the goal, and goal/time indicate whether the local receding-horizon controller reached the marker within the step bound.
 
-The headless API is also exported from `src/simulation/experimentRunner.ts` as `runScenarioBatch`, which defaults to every scenario and the three policy modes. The UI uses a focused batch of `crossing-human`, `standing-human`, and `blocked-corridor` with `maxSteps: 240`.
+The headless API is also exported from `src/simulation/experimentRunner.ts` as `runScenarioBatch`, which defaults to every scenario and the three policy modes. The UI uses a focused batch of `crossing-human`, the new human-motion scenarios, and both spiral-map variants with `maxSteps: 240`.
 
 Measured local batch results with default planner parameters and `maxSteps: 240`:
 
@@ -101,12 +106,21 @@ Measured local batch results with default planner parameters and `maxSteps: 240`
 | Crossing human | belief-mpc | no | - | 0.21m | 0.91m | 0 | 0 | 15.8s |
 | Crossing human | wall-only | yes | 23.8s | 0.20m | 0.09m | 20 | 0 | 0.0s |
 | Crossing human | reactive-stop | no | - | 0.29m | 0.46m | 34 | 0 | 5.3s |
-| Standing human | belief-mpc | no | - | 0.24m | 0.98m | 0 | 0 | 17.5s |
-| Standing human | wall-only | yes | 23.6s | 0.17m | 1.16m | 0 | 0 | 0.0s |
-| Standing human | reactive-stop | yes | 23.6s | 0.17m | 1.16m | 0 | 0 | 0.0s |
-| Blocked corridor | belief-mpc | no | - | 6.29m | 0.96m | 0 | 0 | 28.8s |
-| Blocked corridor | wall-only | yes | 23.8s | 0.20m | 0.14m | 26 | 15 | 0.0s |
-| Blocked corridor | reactive-stop | no | - | 6.18m | 0.85m | 0 | 0 | 28.3s |
+| Followed from behind | belief-mpc | yes | 16.6s | 0.18m | 0.61m | 0 | 0 | 4.3s |
+| Followed from behind | wall-only | yes | 23.3s | 0.19m | 0.61m | 7 | 0 | 0.0s |
+| Followed from behind | reactive-stop | yes | 28.1s | 0.19m | 0.45m | 26 | 0 | 4.8s |
+| Overtaking human | belief-mpc | no | - | 5.45m | 0.51m | 22 | 0 | 25.6s |
+| Overtaking human | wall-only | yes | 23.5s | 0.17m | 0.18m | 32 | 0 | 0.0s |
+| Overtaking human | reactive-stop | yes | 25.7s | 0.17m | 0.40m | 14 | 0 | 2.2s |
+| Yielding blocker | belief-mpc | no | - | 5.46m | 1.00m | 0 | 0 | 24.0s |
+| Yielding blocker | wall-only | yes | 23.8s | 0.20m | 0.21m | 24 | 0 | 0.0s |
+| Yielding blocker | reactive-stop | no | - | 5.44m | 0.81m | 0 | 0 | 26.5s |
+| Spiral corridor known map | belief-mpc | no | - | 2.09m | 1.49m | 0 | 240 | 18.5s |
+| Spiral corridor known map | wall-only | no | - | 0.28m | 0.94m | 0 | 160 | 0.0s |
+| Spiral corridor known map | reactive-stop | no | - | 0.28m | 0.94m | 0 | 160 | 0.0s |
+| Spiral corridor unknown map | belief-mpc | no | - | 1.84m | 1.92m | 0 | 240 | 16.2s |
+| Spiral corridor unknown map | wall-only | no | - | 0.28m | 0.11m | 55 | 160 | 0.0s |
+| Spiral corridor unknown map | reactive-stop | no | - | 0.32m | 0.77m | 0 | 240 | 18.1s |
 
 These numbers are deterministic for the fixed scenarios, seeds, parameters, and step bound, but they are not a benchmark suite. The optimizer is sample-based with fixed seeds, human prediction is simplified, the belief update is a compact approximation rather than SLAM, and the selected scenarios are small regression cases for this simulator.
 

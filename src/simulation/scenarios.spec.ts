@@ -19,6 +19,11 @@ describe('scenario definitions', () => {
       'blocked-corridor',
       'partial-map-bend',
       'multi-human',
+      'follow-behind-human',
+      'overtaking-human',
+      'yielding-blocker',
+      'spiral-known',
+      'spiral-unknown',
     ])
 
     for (const scenario of scenarioDefinitions) {
@@ -35,5 +40,33 @@ describe('scenario definitions', () => {
     const state = createSimulationStateForScenario('multi-human')
 
     expect(state.humans.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('adds requested social-motion scenarios with explicit behavior metadata', () => {
+    expect(
+      createSimulationStateForScenario('follow-behind-human').humans.some(
+        (human) => human.motion?.kind === 'follow-robot',
+      ),
+    ).toBe(true)
+    expect(
+      createSimulationStateForScenario('overtaking-human').humans.some((human) => human.motion?.kind === 'scripted'),
+    ).toBe(true)
+    expect(
+      createSimulationStateForScenario('yielding-blocker').humans.some((human) => human.motion?.kind === 'yield-after'),
+    ).toBe(true)
+  })
+
+  it('adds known and unknown spiral corridors with central goals', () => {
+    const known = createSimulationStateForScenario('spiral-known')
+    const unknown = createSimulationStateForScenario('spiral-unknown')
+
+    expect(known.environment.walls.length).toBeGreaterThanOrEqual(12)
+    expect(unknown.environment.walls.length).toBe(known.environment.walls.length)
+    expect(known.environment.goal.x).toBeCloseTo(5, 1)
+    expect(known.environment.goal.y).toBeCloseTo(2.5, 1)
+    expect(known.belief.estimatedWalls.filter((wall) => wall.confidence > 0.6).length).toBeGreaterThan(
+      known.environment.walls.length / 2,
+    )
+    expect(unknown.belief.estimatedWalls.filter((wall) => wall.confidence > 0.1).length).toBeLessThan(3)
   })
 })

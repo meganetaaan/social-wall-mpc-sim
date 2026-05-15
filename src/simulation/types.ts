@@ -1,7 +1,20 @@
 export type Vec2 = { x: number; y: number }
 export type RobotState = { x: number; y: number; theta: number }
 export type ControlInput = { v: number; omega: number }
-export type HumanState = { id: string; x: number; y: number; vx: number; vy: number; radius: number }
+export type HumanMotionPattern =
+  | { kind: 'linear' }
+  | { kind: 'follow-robot'; distanceBehind: number; lateralOffset: number; speed: number }
+  | { kind: 'scripted'; waypoints: Array<{ at: number; x: number; y: number }>; loop?: boolean }
+  | { kind: 'yield-after'; yieldAt: number; target: Vec2; speed: number }
+export type HumanState = {
+  id: string
+  x: number
+  y: number
+  vx: number
+  vy: number
+  radius: number
+  motion?: HumanMotionPattern
+}
 export type WallSegment = { id: string; a: Vec2; b: Vec2 }
 export type WallBelief = { wallId: string; confidence: number; lastObservedAt: number }
 export type EstimatedWallSegment = {
