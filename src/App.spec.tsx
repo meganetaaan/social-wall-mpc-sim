@@ -12,5 +12,7 @@ describe('App', () => {
     expect(screen.getByText('d_min')).toBeInTheDocument()
     expect(screen.getByText('sampled trajectories')).toBeInTheDocument()
     expect(screen.getByText(/unified stage-cost breakdown/i)).toBeInTheDocument()
+    expect(screen.getByText(/goal distance/i)).toBeInTheDocument()
+    expect(screen.getByText(/goal reached/i)).toBeInTheDocument()
   })
 })

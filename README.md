@@ -1,6 +1,6 @@
 # Social Wall MPC Simulator
 
-Browser-based experiment for a socially-aware wall-following robot. The default `belief-mpc` policy intentionally avoids a separate global planner / local planner switch: every frame uses one finite-horizon sampling MPC objective that combines wall following, human social distance, collision avoidance, control effort, smoothness, progress, pose uncertainty, and wall-map belief uncertainty. Simple baseline policies are included only for comparison.
+Browser-based experiment for a socially-aware wall-following robot. The default `belief-mpc` policy intentionally avoids a separate global planner / local planner switch: every frame uses one finite-horizon sampling MPC objective that combines wall following, goal progress, human social distance, collision avoidance, control effort, smoothness, pose uncertainty, and wall-map belief uncertainty. Simple baseline policies are included only for comparison.
 
 ## Run
 
@@ -34,7 +34,7 @@ This prototype approximates the stage cost as:
 
 ```text
 ℓ(b_t, u_t) ≈ ℓ_wall + ℓ_human + ℓ_collision + ℓ_control
-            + ℓ_smooth + ℓ_progress + ℓ_pose_uncertainty
+            + ℓ_smooth + ℓ_progress + ℓ_goal + ℓ_pose_uncertainty
             + ℓ_map_uncertainty + ℓ_wall_belief_consistency
             - information_gain
 ```
@@ -55,13 +55,13 @@ At each control cycle:
 7. Apply only the first control from the best sequence.
 8. Repeat in the next animation frame.
 
-The planner is deterministic for a fixed seed (`mulberry32`) so behavior can be reproduced.
+The planner is deterministic for a fixed seed (`mulberry32`) so behavior can be reproduced. The same simulation loop is available without React or canvas through `runScenarioExperiment` in `src/simulation/experimentRunner.ts`.
 
 ## Scenarios
 
 The scenario selector resets the simulator into deterministic, named experiment cases. Re-running the same scenario with the same planner parameters and policy mode makes tuning and comparison repeatable.
 
-- **Crossing human**: default wall-following scene with a crossing person and another person near the wall.
+- **Crossing human**: default wall-following scene with a crossing person, another person near the wall, and a reachable green goal in the upper corridor.
 - **Standing human**: a person stands near the followed wall, encouraging slow/yield/deviation behavior.
 - **Head-on human**: a person moves toward the robot along the wall corridor.
 - **Blocked corridor**: a near-wall blockage makes stopping useful for several steps.
@@ -80,6 +80,24 @@ The policy selector compares three modes:
 
 The baselines are comparison tools, not alternative proposed methods. They intentionally separate simple behaviors so the unified-cost formulation can be evaluated against predictable reference policies.
 
+## Goal reaching
+
+The green marker is testable state, not just a visual target. `Environment.goalRadius` defines the arrival threshold; if a scenario omits it, the simulator uses a default radius of `0.45m`. The default scenario sets the same threshold explicitly.
+
+Goal arrival means the robot center is within that radius of `Environment.goal`. Once reached, `goalReached` stays true and `timeToGoal` records the first simulated arrival time. The simulator also tracks current `goalDistance` and `bestGoalDistance`.
+
+Headless verification uses:
+
+```ts
+runScenarioExperiment({
+  scenarioId: 'crossing-human',
+  plannerMode: 'belief-mpc',
+  maxSteps: 700,
+})
+```
+
+The runner builds a deterministic scenario state, steps the same simulator and policy code used by the browser, stops early on goal arrival, and returns the final state plus goal metrics. This is covered by tests so the default `belief-mpc` scenario must keep reaching the green marker within the bounded run.
+
 ## Metrics
 
 The metrics panel reports compact experiment readouts:
@@ -91,6 +109,10 @@ The metrics panel reports compact experiment readouts:
 - **Near collisions**: steps where the robot is too close to walls or static obstacles.
 - **Stop duration**: accumulated time with commanded `v < 0.05`.
 - **Wall progress**: accumulated forward motion along the local wall tangent.
+- **Goal distance**: current distance from robot center to the green goal.
+- **Goal reached**: sticky yes/no arrival state using the scenario goal radius.
+- **Time to goal**: first simulated arrival time, shown only after reaching.
+- **Best goal distance**: closest distance observed so far.
 - **Trace sigma**: current `sigmaX + sigmaY + sigmaTheta`.
 - **Map coverage**: fraction of true wall length covered by estimated wall intervals.
 - **Selected cost**: total cost of the selected rollout for the current step.
@@ -106,6 +128,8 @@ All cost terms are implemented as inspectable functions in `src/planning/cost.ts
 - **Control effort**: quadratic penalty on `v` and `omega`.
 - **Smoothness**: quadratic penalty on changes from the previous control input.
 - **Progress**: negative reward for moving forward along the nearest wall tangent.
+- **Goal progress**: negative reward for local motion in the direction of `Environment.goal`.
+- **Goal terminal**: terminal rollout penalty on final distance to `Environment.goal`.
 - **Pose uncertainty**: `w_uncertainty * trace(Sigma_pose)`.
 - **Map uncertainty**: penalty from uncovered or low-confidence intervals in the estimated wall map.
 - **Expected observation gain**: negative cost for trajectories whose sensor cone is expected to cover uncertain wall intervals.
@@ -132,6 +156,7 @@ The browser view shows:
 - cyan estimated-map overlay only on observed wall intervals
 - subtle sensor field of view and brighter current observation rays/highlights
 - robot pose and heading
+- goal radius ring, `GOAL` label, and `GOAL REACHED` state after arrival
 - moving humans with `d_min` and `d_pref` social zones
 - sampled candidate trajectories
 - selected trajectory
@@ -157,6 +182,7 @@ src/
   rendering/draw.ts
   simulation/dynamics.ts
   simulation/environment.ts
+  simulation/experimentRunner.ts
   simulation/humans.ts
   simulation/metrics.ts
   simulation/scenarios.ts
@@ -179,3 +205,4 @@ Algorithm code is kept independent from rendering. Rendering receives immutable-
 - Safety constraints are soft penalties, so extreme parameter choices can still produce unsafe rollouts.
 - Baselines are deliberately simple and should not be interpreted as tuned controllers.
 - Metrics are frame-step counts and simple geometric summaries, not a statistical benchmark suite.
+- Goal reaching is still local and receding-horizon. There is no global planner, so reaching remains scenario-dependent and can fail if the goal is permanently blocked or placed behind a route that the local candidate set cannot discover.

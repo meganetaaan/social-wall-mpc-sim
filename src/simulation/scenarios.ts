@@ -31,7 +31,8 @@ export type ScenarioDefinition = {
 const defaultWallTargetDistance = 0.85
 
 const baseEnvironment: Environment = {
-  goal: { x: 8.9, y: 3.85 },
+  goal: { x: 7.1, y: 2.7 },
+  goalRadius: 0.45,
   walls: [
     { id: 'follow-wall-start', a: { x: 0.3, y: 0.2 }, b: { x: 2.4, y: 0.2 } },
     { id: 'lower-alcove-left', a: { x: 2.4, y: 0.2 }, b: { x: 2.4, y: 0.95 } },
@@ -190,6 +191,8 @@ function emptyCost(): CostBreakdown {
       mapUncertainty: 0,
       observationGain: 0,
       wallBeliefConsistency: 0,
+      goalProgress: 0,
+      goalTerminal: 0,
     },
     total: 0,
   }
@@ -216,6 +219,10 @@ function emptyMetrics() {
     uncertaintyTrace: 0,
     estimatedMapCoverage: 0,
     selectedCost: 0,
+    goalDistance: 0,
+    goalReached: false,
+    timeToGoal: null,
+    bestGoalDistance: Number.POSITIVE_INFINITY,
   }
 }
 

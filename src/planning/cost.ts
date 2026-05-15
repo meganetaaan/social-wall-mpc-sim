@@ -20,6 +20,8 @@ const emptyTerms = () => ({
   control: 0,
   smoothness: 0,
   progress: 0,
+  goalProgress: 0,
+  goalTerminal: 0,
   uncertainty: 0,
   mapUncertainty: 0,
   observationGain: 0,
@@ -89,11 +91,30 @@ export function evaluateStageCost(args: {
   terms.smoothness =
     parameters.wSmooth * ((control.v - previousControl.v) ** 2 + (control.omega - previousControl.omega) ** 2)
   terms.progress = -parameters.wProgress * control.v * Math.cos(normAngle(robot.theta - wallTangentAngle(nearest.wall)))
+  terms.goalProgress = goalProgressCost(robot, control, environment, parameters)
   terms.uncertainty = parameters.wUncertainty * traceSigma(belief)
   terms.mapUncertainty = parameters.wUncertainty * mapUncertaintyTrace(belief)
   terms.observationGain = -expectedObservationGain(robot, control, environment, belief, parameters)
   terms.wallBeliefConsistency = wallBeliefConsistencyCost(robot, environment, belief, parameters)
   return { terms, total: Object.values(terms).reduce((sum, value) => sum + value, 0) }
+}
+
+export function goalProgressCost(
+  robot: RobotState,
+  control: ControlInput,
+  environment: Environment,
+  p: Pick<PlannerParameters, 'wGoalProgress'>,
+) {
+  const goalHeading = Math.atan2(environment.goal.y - robot.y, environment.goal.x - robot.x)
+  return -p.wGoalProgress * control.v * Math.cos(normAngle(robot.theta - goalHeading))
+}
+
+export function terminalGoalCost(
+  robot: RobotState,
+  environment: Environment,
+  p: Pick<PlannerParameters, 'wGoalTerminal'>,
+) {
+  return p.wGoalTerminal * distance(robot, environment.goal) ** 2
 }
 
 export function expectedObservationGain(

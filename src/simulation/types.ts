@@ -20,7 +20,7 @@ export type WallObservation = {
   rayTarget: Vec2
 }
 export type StaticObstacle = { id: string; x: number; y: number; radius: number }
-export type Environment = { walls: WallSegment[]; obstacles: StaticObstacle[]; goal: Vec2 }
+export type Environment = { walls: WallSegment[]; obstacles: StaticObstacle[]; goal: Vec2; goalRadius?: number }
 export type BeliefState = {
   sigmaX: number
   sigmaY: number
@@ -37,6 +37,8 @@ export type CostTerms = {
   control: number
   smoothness: number
   progress: number
+  goalProgress: number
+  goalTerminal: number
   uncertainty: number
   mapUncertainty: number
   observationGain: number
@@ -61,6 +63,8 @@ export type PlannerParameters = {
   wSmooth: number
   wUncertainty: number
   wProgress: number
+  wGoalProgress: number
+  wGoalTerminal: number
   vMin: number
   vMax: number
   omegaMin: number
@@ -94,6 +98,10 @@ export type SimulationMetrics = {
   uncertaintyTrace: number
   estimatedMapCoverage: number
   selectedCost: number
+  goalDistance: number
+  goalReached: boolean
+  timeToGoal: number | null
+  bestGoalDistance: number
 }
 export type SimulationState = {
   time: number

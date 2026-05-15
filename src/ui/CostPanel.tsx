@@ -61,6 +61,22 @@ export function CostPanel({ cost, state }: Props) {
           <dd>{state.metrics.progressAlongWall.toFixed(2)}m</dd>
         </div>
         <div>
+          <dt>goal distance</dt>
+          <dd>{state.metrics.goalDistance.toFixed(2)}m</dd>
+        </div>
+        <div>
+          <dt>goal reached</dt>
+          <dd>{state.metrics.goalReached ? 'yes' : 'no'}</dd>
+        </div>
+        <div>
+          <dt>time to goal</dt>
+          <dd>{state.metrics.timeToGoal === null ? '-' : `${state.metrics.timeToGoal.toFixed(1)}s`}</dd>
+        </div>
+        <div>
+          <dt>best goal dist</dt>
+          <dd>{state.metrics.bestGoalDistance.toFixed(2)}m</dd>
+        </div>
+        <div>
           <dt>trace sigma</dt>
           <dd>{state.metrics.uncertaintyTrace.toFixed(2)}</dd>
         </div>

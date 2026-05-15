@@ -1,3 +1,4 @@
+import { goalDistance, goalRadius, isGoalReached } from './goal'
 import { distance, length, nearestWall, sub, wallTangentAngle } from './math'
 import type {
   BeliefState,
@@ -34,6 +35,8 @@ export function createInitialMetrics(
   parameters: Pick<PlannerParameters, 'dWallTarget'>,
 ): SimulationMetrics {
   const wallError = wallDistanceError(state.robot, state.environment, parameters)
+  const currentGoalDistance = goalDistance(state.robot, state.environment)
+  const reached = isGoalReached(state.robot, state.environment)
   return {
     elapsedTime: 0,
     meanWallDistanceError: Math.abs(wallError),
@@ -46,6 +49,10 @@ export function createInitialMetrics(
     uncertaintyTrace: uncertaintyTrace(state.belief),
     estimatedMapCoverage: estimatedMapCoverage(state.environment, state.belief),
     selectedCost: state.costBreakdown?.total ?? 0,
+    goalDistance: currentGoalDistance,
+    goalReached: reached,
+    timeToGoal: reached ? 0 : null,
+    bestGoalDistance: currentGoalDistance,
   }
 }
 
@@ -74,6 +81,9 @@ export function updateSimulationMetrics(args: {
   const dx = robot.x - previousRobot.x
   const dy = robot.y - previousRobot.y
   const progress = Math.max(0, dx * Math.cos(tangent) + dy * Math.sin(tangent))
+  const currentGoalDistance = goalDistance(robot, environment)
+  const reachedThisStep = currentGoalDistance <= goalRadius(environment)
+  const goalReached = previous.goalReached || reachedThisStep
 
   return {
     elapsedTime,
@@ -89,6 +99,10 @@ export function updateSimulationMetrics(args: {
     uncertaintyTrace: uncertaintyTrace(belief),
     estimatedMapCoverage: estimatedMapCoverage(environment, belief),
     selectedCost,
+    goalDistance: currentGoalDistance,
+    goalReached,
+    timeToGoal: previous.timeToGoal ?? (reachedThisStep ? elapsedTime : null),
+    bestGoalDistance: Math.min(previous.bestGoalDistance, currentGoalDistance),
   }
 }
 

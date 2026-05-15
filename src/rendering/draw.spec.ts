@@ -38,7 +38,7 @@ function createRecordingContext() {
 }
 
 describe('drawScene', () => {
-  it('draws the goal as a bright green marker with a GOAL label', () => {
+  it('draws the goal radius and reached status from simulation state', () => {
     const { ctx, calls } = createRecordingContext()
 
     drawScene({
@@ -47,6 +47,7 @@ describe('drawScene', () => {
       height: 480,
       environment: {
         goal: { x: 8.9, y: 3.85 },
+        goalRadius: 0.45,
         walls: [{ id: 'wall', a: { x: 0, y: 0 }, b: { x: 10, y: 0 } }],
         obstacles: [],
       },
@@ -58,10 +59,11 @@ describe('drawScene', () => {
       dPref: 1.5,
       sensorRadius: 2,
       sensorFov: Math.PI / 2,
+      goalReached: true,
     })
 
     expect(calls).toContain('fillStyle:#22c55e')
-    expect(calls).toContain('fillText:GOAL')
+    expect(calls).toContain('fillText:GOAL REACHED')
   })
 
   it('draws wall map confidence as a belief layer', () => {

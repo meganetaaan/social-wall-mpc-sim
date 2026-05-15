@@ -9,7 +9,7 @@ import type {
   PlannerParameters,
   RobotState,
 } from '../simulation/types'
-import { addCost, evaluateStageCost } from './cost'
+import { addCost, evaluateStageCost, terminalGoalCost } from './cost'
 
 const zeroCost = () => ({
   terms: {
@@ -20,6 +20,8 @@ const zeroCost = () => ({
     control: 0,
     smoothness: 0,
     progress: 0,
+    goalProgress: 0,
+    goalTerminal: 0,
     uncertainty: 0,
     mapUncertainty: 0,
     observationGain: 0,
@@ -62,6 +64,12 @@ export function rolloutCandidate(args: {
     trajectory.push(robot)
     predictedHumans.push(humans)
     previousControl = control
+  }
+
+  const goalTerminal = terminalGoalCost(robot, args.environment, args.parameters)
+  cost = {
+    terms: { ...cost.terms, goalTerminal: cost.terms.goalTerminal + goalTerminal },
+    total: cost.total + goalTerminal,
   }
 
   return { controls: args.controls, trajectory, predictedHumans, cost }

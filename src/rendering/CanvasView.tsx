@@ -31,6 +31,7 @@ export function CanvasView({ state, parameters }: Props) {
       currentObservations: state.currentObservations,
       sensorRadius: parameters.sensorRadius,
       sensorFov: parameters.sensorFov,
+      goalReached: state.metrics.goalReached,
     })
   }, [state, parameters])
 

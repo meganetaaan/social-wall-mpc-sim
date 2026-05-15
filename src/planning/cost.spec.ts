@@ -54,6 +54,8 @@ describe('modular MPC cost terms', () => {
     expect(Object.keys(breakdown.terms).sort()).toEqual([
       'collision',
       'control',
+      'goalProgress',
+      'goalTerminal',
       'human',
       'mapUncertainty',
       'observationGain',
@@ -65,5 +67,29 @@ describe('modular MPC cost terms', () => {
       'wallHeading',
     ])
     expect(breakdown.total).toBeGreaterThan(0)
+  })
+
+  it('rewards controls that make local progress toward the goal', () => {
+    const environment = { walls: [wall], obstacles: [], goal: { x: 8, y: 1 } }
+    const forward = evaluateStageCost({
+      robot,
+      humans: [],
+      environment,
+      belief,
+      control: { v: 0.6, omega: 0 },
+      previousControl: { v: 0.4, omega: 0 },
+      parameters: defaultParameters,
+    })
+    const stopped = evaluateStageCost({
+      robot,
+      humans: [],
+      environment,
+      belief,
+      control: { v: 0, omega: 0 },
+      previousControl: { v: 0.4, omega: 0 },
+      parameters: defaultParameters,
+    })
+
+    expect(forward.terms.goalProgress).toBeLessThan(stopped.terms.goalProgress)
   })
 })

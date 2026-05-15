@@ -1,3 +1,4 @@
+import { goalRadius } from '../simulation/goal'
 import type {
   BeliefState,
   CandidateRollout,
@@ -35,6 +36,7 @@ export function drawScene(args: {
   dPref: number
   sensorRadius: number
   sensorFov: number
+  goalReached?: boolean
 }) {
   const { ctx, width, height } = args
   const transform = { scale: Math.min(width / 10.8, height / 5.6), offsetX: 28, offsetY: 28, height }
@@ -154,10 +156,11 @@ export function drawScene(args: {
   }
 
   const goal = worldToCanvas(args.environment.goal, transform)
-  ctx.strokeStyle = 'rgba(34, 197, 94, 0.62)'
-  ctx.lineWidth = 4
+  const reached = args.goalReached ?? false
+  ctx.strokeStyle = reached ? 'rgba(187, 247, 208, 0.95)' : 'rgba(34, 197, 94, 0.62)'
+  ctx.lineWidth = reached ? 6 : 4
   ctx.beginPath()
-  ctx.arc(goal.x, goal.y, 0.34 * transform.scale, 0, Math.PI * 2)
+  ctx.arc(goal.x, goal.y, goalRadius(args.environment) * transform.scale, 0, Math.PI * 2)
   ctx.stroke()
   ctx.fillStyle = '#22c55e'
   ctx.beginPath()
@@ -165,7 +168,7 @@ export function drawScene(args: {
   ctx.fill()
   ctx.fillStyle = '#bbf7d0'
   ctx.font = 'bold 14px Inter, sans-serif'
-  ctx.fillText('GOAL', goal.x + 12, goal.y - 12)
+  ctx.fillText(reached ? 'GOAL REACHED' : 'GOAL', goal.x + 12, goal.y - 12)
 
   const r = worldToCanvas(args.robot, transform)
   ctx.fillStyle = '#38bdf8'
