@@ -4,6 +4,21 @@ export type ControlInput = { v: number; omega: number }
 export type HumanState = { id: string; x: number; y: number; vx: number; vy: number; radius: number }
 export type WallSegment = { id: string; a: Vec2; b: Vec2 }
 export type WallBelief = { wallId: string; confidence: number; lastObservedAt: number }
+export type EstimatedWallSegment = {
+  wallId: string
+  tMin: number
+  tMax: number
+  confidence: number
+  lastObservedAt: number
+}
+export type WallObservation = {
+  wallId: string
+  tMin: number
+  tMax: number
+  confidence: number
+  strength: number
+  rayTarget: Vec2
+}
 export type StaticObstacle = { id: string; x: number; y: number; radius: number }
 export type Environment = { walls: WallSegment[]; obstacles: StaticObstacle[]; goal: Vec2 }
 export type BeliefState = {
@@ -12,6 +27,7 @@ export type BeliefState = {
   sigmaTheta: number
   mapConfidence: number
   wallBeliefs: WallBelief[]
+  estimatedWalls: EstimatedWallSegment[]
 }
 export type CostTerms = {
   wall: number
@@ -51,6 +67,8 @@ export type PlannerParameters = {
   omegaMax: number
   robotRadius: number
   wallCollisionDistance: number
+  sensorRadius: number
+  sensorFov: number
 }
 export type CandidateRollout = {
   controls: ControlInput[]
@@ -71,6 +89,7 @@ export type SimulationState = {
   environment: Environment
   belief: BeliefState
   trace: Vec2[]
+  currentObservations: WallObservation[]
   plan: PlanningResult
   costBreakdown: CostBreakdown
 }

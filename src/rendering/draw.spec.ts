@@ -56,6 +56,8 @@ describe('drawScene', () => {
       candidates: [],
       dMin: 0.7,
       dPref: 1.5,
+      sensorRadius: 2,
+      sensorFov: Math.PI / 2,
     })
 
     expect(calls).toContain('fillStyle:#22c55e')
@@ -80,16 +82,23 @@ describe('drawScene', () => {
         sigmaTheta: 0.02,
         mapConfidence: 0.24,
         wallBeliefs: [{ wallId: 'wall', confidence: 0.24, lastObservedAt: 0 }],
+        estimatedWalls: [{ wallId: 'wall', tMin: 0.2, tMax: 0.55, confidence: 0.72, lastObservedAt: 0 }],
       },
+      currentObservations: [
+        { wallId: 'wall', tMin: 0.25, tMax: 0.5, confidence: 0.8, strength: 0.7, rayTarget: { x: 1, y: 0 } },
+      ],
       robot: { x: 1, y: 1, theta: 0 },
       humans: [],
       trace: [],
       candidates: [],
       dMin: 0.7,
       dPref: 1.5,
+      sensorRadius: 2,
+      sensorFov: Math.PI / 2,
     })
 
-    expect(calls).toContain('fillText:map belief')
+    expect(calls).toContain('fillText:estimated wall coverage')
     expect(calls.some((call) => call.startsWith('strokeStyle:rgba(125, 211, 252'))).toBe(true)
+    expect(calls).toContain('strokeStyle:rgba(34, 211, 238, 0.78)')
   })
 })

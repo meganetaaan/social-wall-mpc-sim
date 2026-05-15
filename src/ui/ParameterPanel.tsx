@@ -10,6 +10,8 @@ type NumericKey = keyof Pick<
   | 'wControlV'
   | 'wSmooth'
   | 'wUncertainty'
+  | 'sensorRadius'
+  | 'sensorFov'
   | 'horizonSteps'
   | 'sampleCount'
 >
@@ -22,6 +24,8 @@ const rows: { key: NumericKey; label: string; min: number; max: number; step: nu
   { key: 'wControlV', label: 'w_control', min: 0, max: 3, step: 0.05 },
   { key: 'wSmooth', label: 'w_smooth', min: 0, max: 8, step: 0.1 },
   { key: 'wUncertainty', label: 'w_uncertainty', min: 0, max: 8, step: 0.1 },
+  { key: 'sensorRadius', label: 'sensor radius', min: 0.8, max: 4, step: 0.05 },
+  { key: 'sensorFov', label: 'sensor FOV rad', min: 0.5, max: Math.PI * 1.6, step: 0.05 },
   { key: 'horizonSteps', label: 'prediction horizon', min: 4, max: 24, step: 1 },
   { key: 'sampleCount', label: 'sampled trajectories', min: 10, max: 180, step: 1 },
 ]

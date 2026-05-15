@@ -21,11 +21,15 @@ const initialBelief: BeliefState = {
     { wallId: 'observed-wall', confidence: 0.2, lastObservedAt: -1 },
     { wallId: 'far-wall', confidence: 0.7, lastObservedAt: -1 },
   ],
+  estimatedWalls: [
+    { wallId: 'observed-wall', tMin: 0, tMax: 0, confidence: 0, lastObservedAt: -1 },
+    { wallId: 'far-wall', tMin: 0, tMax: 0.6, confidence: 0.7, lastObservedAt: -1 },
+  ],
 }
 
 describe('map belief update', () => {
   it('raises confidence for nearby observed walls without claiming all walls are known', () => {
-    const robot: RobotState = { x: 1, y: 0.45, theta: 0 }
+    const robot: RobotState = { x: 1, y: 0.45, theta: -Math.PI / 2 }
 
     const updated = updateBelief(initialBelief, robot, environment, defaultParameters, 12)
 
@@ -34,19 +38,20 @@ describe('map belief update', () => {
     expect(observed?.confidence).toBeGreaterThan(0.2)
     expect(observed?.lastObservedAt).toBe(12)
     expect(far?.confidence).toBeLessThanOrEqual(0.7)
-    expect(updated.mapConfidence).toBeCloseTo(
-      (updated.wallBeliefs[0].confidence + updated.wallBeliefs[1].confidence) / 2,
-    )
+    expect(updated.estimatedWalls.find((wall) => wall.wallId === 'observed-wall')?.tMax).toBeGreaterThan(0)
+    expect(updated.mapConfidence).toBeGreaterThan(0)
   })
 
   it('makes map uncertainty trace larger when wall confidence is lower', () => {
     const confident: BeliefState = {
       ...initialBelief,
       wallBeliefs: initialBelief.wallBeliefs.map((wall) => ({ ...wall, confidence: 0.95 })),
+      estimatedWalls: initialBelief.estimatedWalls.map((wall) => ({ ...wall, tMin: 0, tMax: 1, confidence: 0.95 })),
     }
     const uncertain: BeliefState = {
       ...initialBelief,
       wallBeliefs: initialBelief.wallBeliefs.map((wall) => ({ ...wall, confidence: 0.2 })),
+      estimatedWalls: initialBelief.estimatedWalls.map((wall) => ({ ...wall, tMin: 0, tMax: 0.2, confidence: 0.2 })),
     }
 
     expect(mapUncertaintyTrace(uncertain)).toBeGreaterThan(mapUncertaintyTrace(confident))

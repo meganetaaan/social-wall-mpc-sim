@@ -1,4 +1,5 @@
 import { mapUncertaintyTrace, traceSigma, updateBelief, wallConfidence } from '../belief/simpleBelief'
+import { estimatedWallKnowledge, observedCoverageRatio, observeWalls } from '../belief/wallMapBelief'
 import { distance, nearestWall, normAngle, wallTangentAngle } from '../simulation/math'
 import type {
   BeliefState,
@@ -102,11 +103,20 @@ export function expectedObservationGain(
   belief: BeliefState,
   p: PlannerParameters,
 ) {
-  const nearest = nearestWall({ x: robot.x, y: robot.y }, environment.walls)
-  const confidenceGap = 1 - wallConfidence(belief, nearest.wall.id)
-  const sensorOpportunity = Math.max(0, 1 - nearest.distance / 1.8)
-  const lookingAlongWall = Math.max(0, Math.cos(normAngle(robot.theta - wallTangentAngle(nearest.wall))))
-  return p.wUncertainty * 0.45 * confidenceGap * sensorOpportunity * (0.4 + control.v) * (0.4 + lookingAlongWall)
+  const observations = observeWalls(robot, environment, p)
+  let gain = 0
+  for (const observation of observations) {
+    const estimated = belief.estimatedWalls.find((candidate) => candidate.wallId === observation.wallId)
+    const known = estimatedWallKnowledge(estimated)
+    const newCoverage =
+      estimated && estimated.tMax > estimated.tMin
+        ? Math.max(0, estimated.tMin - observation.tMin) + Math.max(0, observation.tMax - estimated.tMax)
+        : observation.tMax - observation.tMin
+    const intervalGain = Math.max(0.04, Math.min(1, newCoverage + (1 - known) * 0.35))
+    gain += observation.strength * intervalGain
+  }
+  const forwardLook = Math.max(0.2, control.v + 0.2)
+  return p.wUncertainty * 0.5 * gain * forwardLook
 }
 
 export function wallBeliefConsistencyCost(
@@ -117,7 +127,21 @@ export function wallBeliefConsistencyCost(
 ) {
   const nearest = nearestWall({ x: robot.x, y: robot.y }, environment.walls)
   const confidenceGap = 1 - wallConfidence(belief, nearest.wall.id)
-  return p.wUncertainty * confidenceGap * (nearest.distance - p.dWallTarget) ** 2
+  const nearbyWalls = environment.walls.filter(
+    (wall) => nearestWall({ x: robot.x, y: robot.y }, [wall]).distance < p.sensorRadius,
+  )
+  const nearbyUncertainty =
+    nearbyWalls.reduce((sum, wall) => {
+      const estimated = belief.estimatedWalls.find((candidate) => candidate.wallId === wall.id)
+      return sum + (1 - estimatedWallKnowledge(estimated))
+    }, 0) / Math.max(1, nearbyWalls.length)
+  const coverage = observedCoverageRatio(
+    belief.estimatedWalls.find((candidate) => candidate.wallId === nearest.wall.id) ?? { tMin: 0, tMax: 0 },
+  )
+  return (
+    p.wUncertainty *
+    (confidenceGap * (nearest.distance - p.dWallTarget) ** 2 + nearbyUncertainty * 0.35 + (1 - coverage) * 0.25)
+  )
 }
 
 export function addCost(a: CostBreakdown, b: CostBreakdown): CostBreakdown {

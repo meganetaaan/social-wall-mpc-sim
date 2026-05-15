@@ -12,6 +12,7 @@ const belief: BeliefState = {
   sigmaTheta: 0.05,
   mapConfidence: 0.9,
   wallBeliefs: [{ wallId: 'north-wall', confidence: 0.9, lastObservedAt: 0 }],
+  estimatedWalls: [{ wallId: 'north-wall', tMin: 0, tMax: 0.8, confidence: 0.9, lastObservedAt: 0 }],
 }
 
 describe('modular MPC cost terms', () => {

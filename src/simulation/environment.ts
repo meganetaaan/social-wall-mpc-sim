@@ -24,6 +24,8 @@ export const defaultParameters: PlannerParameters = {
   omegaMax: 1.6,
   robotRadius: 0.22,
   wallCollisionDistance: 0.36,
+  sensorRadius: 2.25,
+  sensorFov: Math.PI * 0.82,
 }
 
 const emptyCost: CostBreakdown = {
@@ -92,8 +94,22 @@ export function createDefaultSimulationState(): SimulationState {
         { wallId: 'upper-pocket', confidence: 0.12, lastObservedAt: -1 },
         { wallId: 'left-short-wall', confidence: 0.34, lastObservedAt: -1 },
       ],
+      estimatedWalls: [
+        { wallId: 'follow-wall-start', tMin: 0.18, tMax: 0.46, confidence: 0.72, lastObservedAt: 0 },
+        { wallId: 'lower-alcove-left', tMin: 0, tMax: 0, confidence: 0, lastObservedAt: -1 },
+        { wallId: 'lower-alcove-back', tMin: 0, tMax: 0, confidence: 0, lastObservedAt: -1 },
+        { wallId: 'lower-alcove-right', tMin: 0, tMax: 0, confidence: 0, lastObservedAt: -1 },
+        { wallId: 'follow-wall-middle', tMin: 0, tMax: 0, confidence: 0, lastObservedAt: -1 },
+        { wallId: 'inner-baffle', tMin: 0, tMax: 0, confidence: 0, lastObservedAt: -1 },
+        { wallId: 'upper-bend', tMin: 0, tMax: 0, confidence: 0, lastObservedAt: -1 },
+        { wallId: 'right-wall', tMin: 0, tMax: 0, confidence: 0, lastObservedAt: -1 },
+        { wallId: 'top-wall', tMin: 0, tMax: 0, confidence: 0, lastObservedAt: -1 },
+        { wallId: 'upper-pocket', tMin: 0, tMax: 0, confidence: 0, lastObservedAt: -1 },
+        { wallId: 'left-short-wall', tMin: 0, tMax: 0, confidence: 0, lastObservedAt: -1 },
+      ],
     },
     trace: [{ x: 1.0, y: 0.86 }],
+    currentObservations: [],
     plan: emptyPlan,
     costBreakdown: emptyCost,
   }

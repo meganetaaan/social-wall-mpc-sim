@@ -49,7 +49,7 @@ export default function App() {
       </header>
       <div className="layout">
         <section className="stage">
-          <CanvasView state={state} dMin={parameters.dMin} dPref={parameters.dPref} />
+          <CanvasView state={state} parameters={parameters} />
           <Controls running={running} onToggle={() => setRunning((value) => !value)} onReset={reset} onStep={step} />
         </section>
         <aside>

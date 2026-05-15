@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react'
-import type { SimulationState } from '../simulation/types'
+import type { PlannerParameters, SimulationState } from '../simulation/types'
 import { drawScene } from './draw'
 
-type Props = { state: SimulationState; dMin: number; dPref: number }
+type Props = { state: SimulationState; parameters: PlannerParameters }
 
-export function CanvasView({ state, dMin, dPref }: Props) {
+export function CanvasView({ state, parameters }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   useEffect(() => {
     const canvas = canvasRef.current
@@ -26,10 +26,13 @@ export function CanvasView({ state, dMin, dPref }: Props) {
       trace: state.trace,
       candidates: state.plan.candidates,
       selected: state.plan.selected,
-      dMin,
-      dPref,
+      dMin: parameters.dMin,
+      dPref: parameters.dPref,
+      currentObservations: state.currentObservations,
+      sensorRadius: parameters.sensorRadius,
+      sensorFov: parameters.sensorFov,
     })
-  }, [state, dMin, dPref])
+  }, [state, parameters])
 
   return <canvas ref={canvasRef} className="sim-canvas" aria-label="Top-down socially aware wall following simulator" />
 }

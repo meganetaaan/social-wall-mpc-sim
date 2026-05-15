@@ -37,7 +37,7 @@ This prototype approximates the stage cost as:
             - information_gain
 ```
 
-where `b_t` is represented by a lightweight pose covariance plus per-wall confidence values. This is not full EKF-SLAM, but the wall map itself is part of the belief state and is updated as the robot observes nearby wall segments.
+where `b_t` is represented by a lightweight pose covariance plus an estimated wall map. The simulator keeps the true wall map for collision and sensor simulation, while planning reads from estimated wall coverage and confidence. This is not full EKF-SLAM, but map estimation is part of the same receding-horizon belief state used by the objective.
 
 ## Implemented approximation
 
@@ -47,10 +47,11 @@ At each control cycle:
 2. Roll out differential-drive dynamics:
    `x += v cos(theta) dt`, `y += v sin(theta) dt`, `theta += omega dt`.
 3. Predict humans with a deterministic constant-velocity/bouncing-boundary model.
-4. Update a simplified belief: pose uncertainty grows with motion and shrinks near observed walls; nearby wall segments gain confidence while unobserved segments remain uncertain.
-5. Evaluate the unified cost breakdown for each rollout.
-6. Apply only the first control from the best sequence.
-7. Repeat in the next animation frame.
+4. Generate deterministic range observations from the robot sensor cone against true wall segments.
+5. Update a simplified belief: pose uncertainty grows with motion and shrinks near observed walls; observed wall intervals expand their estimated coverage and confidence while unobserved intervals remain uncertain.
+6. Evaluate the unified cost breakdown for each rollout.
+7. Apply only the first control from the best sequence.
+8. Repeat in the next animation frame.
 
 The planner is deterministic for a fixed seed (`mulberry32`) so behavior can be reproduced.
 
@@ -66,16 +67,30 @@ All cost terms are implemented as inspectable functions in `src/planning/cost.ts
 - **Smoothness**: quadratic penalty on changes from the previous control input.
 - **Progress**: negative reward for moving forward along the nearest wall tangent.
 - **Pose uncertainty**: `w_uncertainty * trace(Sigma_pose)`.
-- **Map uncertainty**: penalty from the average `(1 - wall_confidence)` over the wall-belief map.
-- **Expected observation gain**: negative cost for trajectories that keep uncertain walls observable, approximating information-seeking behavior.
-- **Wall-belief consistency**: extra wall-following penalty when the nearest wall has low confidence, so the optimizer prefers trajectories that maintain useful wall observations rather than treating the map as fully known.
+- **Map uncertainty**: penalty from uncovered or low-confidence intervals in the estimated wall map.
+- **Expected observation gain**: negative cost for trajectories whose sensor cone is expected to cover uncertain wall intervals.
+- **Wall-belief consistency**: extra wall-following penalty when the nearest or nearby walls have low estimated coverage/confidence, so the optimizer prefers trajectories that maintain useful wall observations rather than treating the map as fully known.
+
+## Map belief and observations
+
+The true map is `Environment.walls`. It is deliberately separate from `BeliefState.estimatedWalls`, which stores one merged observed interval per wall as `[tMin, tMax]` in segment parameter space, plus confidence and `lastObservedAt`.
+
+The observation model is a deterministic approximation, not ray-cast SLAM:
+
+- the robot has a limited `sensorRadius` and `sensorFov`
+- sample points on each true wall are observable when they are inside range and bearing limits
+- an observation records the visible interval, strength/confidence, and a representative ray target
+- repeated observations merge intervals and raise confidence
+- uncovered portions of a wall continue to contribute map uncertainty
 
 ## UI
 
 The browser view shows:
 
 - top-down world with static walls and a pillar obstacle
-- cyan wall-belief overlay: brighter segments are better observed / higher confidence
+- dim gray true wall map
+- cyan estimated-map overlay only on observed wall intervals
+- subtle sensor field of view and brighter current observation rays/highlights
 - robot pose and heading
 - moving humans with `d_min` and `d_pref` social zones
 - sampled candidate trajectories
@@ -91,6 +106,7 @@ The browser view shows:
 src/
   App.tsx
   belief/simpleBelief.ts
+  belief/wallMapBelief.ts
   planning/cost.ts
   planning/rollout.ts
   planning/samplingMpc.ts
@@ -110,7 +126,8 @@ Algorithm code is kept independent from rendering. Rendering receives immutable-
 
 ## Known limitations
 
-- Belief update is a pedagogical scalar covariance and per-wall confidence approximation, not EKF/Graph-SLAM.
+- Belief update is a pedagogical scalar covariance plus per-wall interval coverage approximation, not EKF/Graph-SLAM.
+- Wall visibility ignores occlusion and uses sampled wall points rather than geometric clipping/ray casting.
 - Candidate generation is simple sampling around a few motion templates, not full MPPI with weighted updates.
 - Human prediction is constant-velocity and does not model intent.
 - Wall selection is nearest-wall based; there is no global route or topological planner.

@@ -1,9 +1,22 @@
-import type { BeliefState, CandidateRollout, Environment, HumanState, RobotState, Vec2 } from '../simulation/types'
+import type {
+  BeliefState,
+  CandidateRollout,
+  Environment,
+  HumanState,
+  RobotState,
+  Vec2,
+  WallObservation,
+  WallSegment,
+} from '../simulation/types'
 
 type Transform = { scale: number; offsetX: number; offsetY: number; height: number }
 const worldToCanvas = (p: Vec2, t: Transform): Vec2 => ({
   x: t.offsetX + p.x * t.scale,
   y: t.height - (t.offsetY + p.y * t.scale),
+})
+const pointOnWall = (wall: WallSegment, t: number): Vec2 => ({
+  x: wall.a.x + (wall.b.x - wall.a.x) * t,
+  y: wall.a.y + (wall.b.y - wall.a.y) * t,
 })
 
 export function drawScene(args: {
@@ -17,8 +30,11 @@ export function drawScene(args: {
   trace: Vec2[]
   candidates: CandidateRollout[]
   selected?: CandidateRollout
+  currentObservations?: WallObservation[]
   dMin: number
   dPref: number
+  sensorRadius: number
+  sensorFov: number
 }) {
   const { ctx, width, height } = args
   const transform = { scale: Math.min(width / 10.8, height / 5.6), offsetX: 28, offsetY: 28, height }
@@ -44,6 +60,8 @@ export function drawScene(args: {
     ctx.stroke()
   }
 
+  drawSensorFov(ctx, args.robot, transform, args.sensorRadius, args.sensorFov)
+
   ctx.lineCap = 'round'
   ctx.lineWidth = 8
   ctx.strokeStyle = 'rgba(148, 163, 184, 0.32)'
@@ -57,12 +75,14 @@ export function drawScene(args: {
   }
 
   if (args.belief) {
-    ctx.lineWidth = 5
-    for (const wall of args.environment.walls) {
-      const confidence = args.belief.wallBeliefs.find((candidate) => candidate.wallId === wall.id)?.confidence ?? 0
-      const a = worldToCanvas(wall.a, transform)
-      const b = worldToCanvas(wall.b, transform)
-      ctx.strokeStyle = `rgba(125, 211, 252, ${Math.max(0.12, confidence).toFixed(2)})`
+    ctx.lineWidth = 6
+    for (const estimated of args.belief.estimatedWalls) {
+      if (estimated.tMax <= estimated.tMin) continue
+      const wall = args.environment.walls.find((candidate) => candidate.id === estimated.wallId)
+      if (!wall) continue
+      const a = worldToCanvas(pointOnWall(wall, estimated.tMin), transform)
+      const b = worldToCanvas(pointOnWall(wall, estimated.tMax), transform)
+      ctx.strokeStyle = `rgba(125, 211, 252, ${Math.max(0.22, estimated.confidence).toFixed(2)})`
       ctx.beginPath()
       ctx.moveTo(a.x, a.y)
       ctx.lineTo(b.x, b.y)
@@ -70,7 +90,32 @@ export function drawScene(args: {
     }
     ctx.fillStyle = '#bae6fd'
     ctx.font = '12px Inter, sans-serif'
-    ctx.fillText('map belief', 32, 24)
+    ctx.fillText('estimated wall coverage', 32, 24)
+  }
+
+  if (args.currentObservations && args.currentObservations.length > 0) {
+    ctx.lineWidth = 2
+    ctx.strokeStyle = 'rgba(186, 230, 253, 0.46)'
+    const robot = worldToCanvas(args.robot, transform)
+    for (const observation of args.currentObservations) {
+      const target = worldToCanvas(observation.rayTarget, transform)
+      ctx.beginPath()
+      ctx.moveTo(robot.x, robot.y)
+      ctx.lineTo(target.x, target.y)
+      ctx.stroke()
+      const wall = args.environment.walls.find((candidate) => candidate.id === observation.wallId)
+      if (!wall) continue
+      const a = worldToCanvas(pointOnWall(wall, observation.tMin), transform)
+      const b = worldToCanvas(pointOnWall(wall, observation.tMax), transform)
+      ctx.lineWidth = 9
+      ctx.strokeStyle = 'rgba(34, 211, 238, 0.78)'
+      ctx.beginPath()
+      ctx.moveTo(a.x, a.y)
+      ctx.lineTo(b.x, b.y)
+      ctx.stroke()
+      ctx.lineWidth = 2
+      ctx.strokeStyle = 'rgba(186, 230, 253, 0.46)'
+    }
   }
 
   for (const obstacle of args.environment.obstacles) {
@@ -135,6 +180,27 @@ export function drawScene(args: {
     r.x + Math.cos(args.robot.theta) * 0.42 * transform.scale,
     r.y - Math.sin(args.robot.theta) * 0.42 * transform.scale,
   )
+  ctx.stroke()
+}
+
+function drawSensorFov(
+  ctx: CanvasRenderingContext2D,
+  robot: RobotState,
+  transform: Transform,
+  sensorRadius: number,
+  sensorFov: number,
+) {
+  const center = worldToCanvas(robot, transform)
+  const start = -robot.theta - sensorFov / 2
+  const end = -robot.theta + sensorFov / 2
+  ctx.fillStyle = 'rgba(14, 165, 233, 0.08)'
+  ctx.strokeStyle = 'rgba(125, 211, 252, 0.18)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(center.x, center.y)
+  ctx.arc(center.x, center.y, sensorRadius * transform.scale, start, end)
+  ctx.lineTo(center.x, center.y)
+  ctx.fill()
   ctx.stroke()
 }
 
