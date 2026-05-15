@@ -11,6 +11,14 @@ npm run dev
 
 Open the Vite URL printed by `npm run dev`. The app runs fully in the browser; there is no backend.
 
+The public GitHub Pages deployment is configured for:
+
+```text
+https://meganetaaan.github.io/social-wall-mpc-sim/
+```
+
+Every push to `main` runs lint, tests, build, and then deploys the `dist` artifact through GitHub Pages.
+
 Quality gates:
 
 ```bash
