@@ -37,7 +37,7 @@ describe('modular MPC cost terms', () => {
     const breakdown = evaluateStageCost({
       robot,
       humans: [{ id: 'h1', x: 2, y: 1, vx: 0, vy: 0, radius: 0.22 }],
-      environment: { walls: [wall], obstacles: [] },
+      environment: { walls: [wall], obstacles: [], goal: { x: 8.9, y: 3.85 } },
       belief,
       control,
       previousControl: { v: 0.4, omega: 0.1 },

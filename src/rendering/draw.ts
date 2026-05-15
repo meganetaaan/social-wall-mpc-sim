@@ -90,6 +90,20 @@ export function drawScene(args: {
     ctx.fill()
   }
 
+  const goal = worldToCanvas(args.environment.goal, transform)
+  ctx.strokeStyle = 'rgba(34, 197, 94, 0.62)'
+  ctx.lineWidth = 4
+  ctx.beginPath()
+  ctx.arc(goal.x, goal.y, 0.34 * transform.scale, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.fillStyle = '#22c55e'
+  ctx.beginPath()
+  ctx.arc(goal.x, goal.y, 0.16 * transform.scale, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#bbf7d0'
+  ctx.font = 'bold 14px Inter, sans-serif'
+  ctx.fillText('GOAL', goal.x + 12, goal.y - 12)
+
   const r = worldToCanvas(args.robot, transform)
   ctx.fillStyle = '#38bdf8'
   ctx.beginPath()

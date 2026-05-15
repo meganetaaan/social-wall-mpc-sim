@@ -6,6 +6,7 @@ HTMLCanvasElement.prototype.getContext = (() => ({
   clearRect: () => {},
   fill: () => {},
   fillRect: () => {},
+  fillText: () => {},
   lineTo: () => {},
   moveTo: () => {},
   setTransform: () => {},

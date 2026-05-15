@@ -4,7 +4,7 @@ export type ControlInput = { v: number; omega: number }
 export type HumanState = { id: string; x: number; y: number; vx: number; vy: number; radius: number }
 export type WallSegment = { id: string; a: Vec2; b: Vec2 }
 export type StaticObstacle = { id: string; x: number; y: number; radius: number }
-export type Environment = { walls: WallSegment[]; obstacles: StaticObstacle[] }
+export type Environment = { walls: WallSegment[]; obstacles: StaticObstacle[]; goal: Vec2 }
 export type BeliefState = { sigmaX: number; sigmaY: number; sigmaTheta: number; mapConfidence: number }
 export type CostTerms = {
   wall: number
