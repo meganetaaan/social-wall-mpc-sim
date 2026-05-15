@@ -104,6 +104,21 @@ input[type="range"] {
   width: 100%;
   accent-color: #38bdf8;
 }
+.select-row {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+  color: #bfdbfe;
+  font-size: 0.9rem;
+}
+select {
+  width: 100%;
+  border: 1px solid #1e3a8a;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 0.55rem 0.65rem;
+}
 .cost-list {
   display: grid;
   gap: 8px;
@@ -142,6 +157,25 @@ dd {
   color: #cbd5e1;
   font-size: 0.9rem;
   line-height: 1.6;
+}
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.metric-grid div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  border-bottom: 1px solid rgba(30, 58, 138, 0.45);
+  padding-bottom: 4px;
+}
+.metric-grid dd {
+  background: transparent;
+  padding: 0;
+  overflow: visible;
 }
 @media (max-width: 980px) {
   .layout {

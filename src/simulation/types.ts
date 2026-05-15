@@ -81,6 +81,20 @@ export type PlanningResult = {
   selected: CandidateRollout
   bestControl: ControlInput
 }
+export type PlannerMode = 'belief-mpc' | 'wall-only' | 'reactive-stop'
+export type SimulationMetrics = {
+  elapsedTime: number
+  meanWallDistanceError: number
+  maxWallDistanceError: number
+  minHumanDistance: number
+  socialViolationCount: number
+  nearCollisionCount: number
+  stopDuration: number
+  progressAlongWall: number
+  uncertaintyTrace: number
+  estimatedMapCoverage: number
+  selectedCost: number
+}
 export type SimulationState = {
   time: number
   robot: RobotState
@@ -92,4 +106,5 @@ export type SimulationState = {
   currentObservations: WallObservation[]
   plan: PlanningResult
   costBreakdown: CostBreakdown
+  metrics: SimulationMetrics
 }

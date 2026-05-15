@@ -26,6 +26,53 @@ export function CostPanel({ cost, state }: Props) {
         {(state.belief.sigmaX + state.belief.sigmaY + state.belief.sigmaTheta).toFixed(2)} · map{' '}
         {state.belief.mapConfidence.toFixed(2)} · cov {coverage.toFixed(2)} · rays {state.currentObservations.length}
       </p>
+      <h2>Experiment metrics</h2>
+      <dl className="metric-grid">
+        <div>
+          <dt>elapsed</dt>
+          <dd>{state.metrics.elapsedTime.toFixed(1)}s</dd>
+        </div>
+        <div>
+          <dt>mean wall err</dt>
+          <dd>{state.metrics.meanWallDistanceError.toFixed(2)}m</dd>
+        </div>
+        <div>
+          <dt>max wall err</dt>
+          <dd>{state.metrics.maxWallDistanceError.toFixed(2)}m</dd>
+        </div>
+        <div>
+          <dt>min human dist</dt>
+          <dd>{state.metrics.minHumanDistance.toFixed(2)}m</dd>
+        </div>
+        <div>
+          <dt>social violations</dt>
+          <dd>{state.metrics.socialViolationCount}</dd>
+        </div>
+        <div>
+          <dt>near collisions</dt>
+          <dd>{state.metrics.nearCollisionCount}</dd>
+        </div>
+        <div>
+          <dt>stop duration</dt>
+          <dd>{state.metrics.stopDuration.toFixed(1)}s</dd>
+        </div>
+        <div>
+          <dt>wall progress</dt>
+          <dd>{state.metrics.progressAlongWall.toFixed(2)}m</dd>
+        </div>
+        <div>
+          <dt>trace sigma</dt>
+          <dd>{state.metrics.uncertaintyTrace.toFixed(2)}</dd>
+        </div>
+        <div>
+          <dt>map coverage</dt>
+          <dd>{state.metrics.estimatedMapCoverage.toFixed(2)}</dd>
+        </div>
+        <div>
+          <dt>selected cost</dt>
+          <dd>{state.metrics.selectedCost.toFixed(2)}</dd>
+        </div>
+      </dl>
     </section>
   )
 }

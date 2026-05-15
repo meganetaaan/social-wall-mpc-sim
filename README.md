@@ -1,6 +1,6 @@
 # Social Wall MPC Simulator
 
-Browser-based experiment for a socially-aware wall-following robot. The simulator intentionally avoids a separate global planner / local planner switch: every frame uses one finite-horizon sampling MPC objective that combines wall following, human social distance, collision avoidance, control effort, smoothness, progress, pose uncertainty, and wall-map belief uncertainty.
+Browser-based experiment for a socially-aware wall-following robot. The default `belief-mpc` policy intentionally avoids a separate global planner / local planner switch: every frame uses one finite-horizon sampling MPC objective that combines wall following, human social distance, collision avoidance, control effort, smoothness, progress, pose uncertainty, and wall-map belief uncertainty. Simple baseline policies are included only for comparison.
 
 ## Run
 
@@ -8,6 +8,8 @@ Browser-based experiment for a socially-aware wall-following robot. The simulato
 npm install
 npm run dev
 ```
+
+Open the Vite URL printed by `npm run dev`. The app runs fully in the browser; there is no backend.
 
 Quality gates:
 
@@ -55,6 +57,44 @@ At each control cycle:
 
 The planner is deterministic for a fixed seed (`mulberry32`) so behavior can be reproduced.
 
+## Scenarios
+
+The scenario selector resets the simulator into deterministic, named experiment cases. Re-running the same scenario with the same planner parameters and policy mode makes tuning and comparison repeatable.
+
+- **Crossing human**: default wall-following scene with a crossing person and another person near the wall.
+- **Standing human**: a person stands near the followed wall, encouraging slow/yield/deviation behavior.
+- **Head-on human**: a person moves toward the robot along the wall corridor.
+- **Blocked corridor**: a near-wall blockage makes stopping useful for several steps.
+- **Partial-map bend**: a bent and alcove-like wall layout where estimated wall coverage matters.
+- **Multi-human**: multiple people create competing social costs.
+
+Scenarios are defined in `src/simulation/scenarios.ts` and instantiate only simulation state: robot pose, humans, environment, and initial belief. Rendering does not contain scenario logic.
+
+## Policy comparison
+
+The policy selector compares three modes:
+
+- **belief-mpc**: the proposed mode and default. It optimizes wall following, social distance, collision, smoothness, progress, and belief/map uncertainty together in one receding-horizon cost.
+- **wall-only**: a small baseline wall follower that ignores humans and uncertainty. It is expected to keep moving even when that creates social-distance violations.
+- **reactive-stop**: a hard-switch baseline that follows the wall until any human is within `d_min` plus a small buffer, then abruptly commands zero velocity.
+
+The baselines are comparison tools, not alternative proposed methods. They intentionally separate simple behaviors so the unified-cost formulation can be evaluated against predictable reference policies.
+
+## Metrics
+
+The metrics panel reports compact experiment readouts:
+
+- **Elapsed time**: simulated seconds.
+- **Mean/max wall distance error**: observed error from `d_wall_target`.
+- **Minimum human distance**: closest robot-human center distance observed so far.
+- **Social violations**: steps where robot-human distance is below `d_min`.
+- **Near collisions**: steps where the robot is too close to walls or static obstacles.
+- **Stop duration**: accumulated time with commanded `v < 0.05`.
+- **Wall progress**: accumulated forward motion along the local wall tangent.
+- **Trace sigma**: current `sigmaX + sigmaY + sigmaTheta`.
+- **Map coverage**: fraction of true wall length covered by estimated wall intervals.
+- **Selected cost**: total cost of the selected rollout for the current step.
+
 ## Cost terms
 
 All cost terms are implemented as inspectable functions in `src/planning/cost.ts`.
@@ -97,6 +137,8 @@ The browser view shows:
 - selected trajectory
 - robot trace/history
 - live cost breakdown and belief readout, including map-confidence terms
+- live experiment metrics for repeated comparisons
+- scenario and policy selectors
 - start/pause/reset/step controls
 - sliders for social, wall, cost, horizon, and sampling parameters
 
@@ -108,6 +150,7 @@ src/
   belief/simpleBelief.ts
   belief/wallMapBelief.ts
   planning/cost.ts
+  planning/policies.ts
   planning/rollout.ts
   planning/samplingMpc.ts
   rendering/CanvasView.tsx
@@ -115,6 +158,8 @@ src/
   simulation/dynamics.ts
   simulation/environment.ts
   simulation/humans.ts
+  simulation/metrics.ts
+  simulation/scenarios.ts
   simulation/simulator.ts
   simulation/types.ts
   ui/Controls.tsx
@@ -132,3 +177,5 @@ Algorithm code is kept independent from rendering. Rendering receives immutable-
 - Human prediction is constant-velocity and does not model intent.
 - Wall selection is nearest-wall based; there is no global route or topological planner.
 - Safety constraints are soft penalties, so extreme parameter choices can still produce unsafe rollouts.
+- Baselines are deliberately simple and should not be interpreted as tuned controllers.
+- Metrics are frame-step counts and simple geometric summaries, not a statistical benchmark suite.
