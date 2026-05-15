@@ -48,14 +48,14 @@ describe('simulation metrics', () => {
     const state = createSimulationStateForScenario('crossing-human')
     const atDefaultRadius = {
       ...state,
-      robot: { x: state.environment.goal.x + 0.4, y: state.environment.goal.y, theta: 0 },
+      robot: { x: state.environment.goal.x + 0.18, y: state.environment.goal.y, theta: 0 },
       environment: { ...state.environment, goalRadius: undefined },
     }
 
     const metrics = createInitialMetrics(atDefaultRadius, defaultParameters)
 
     expect(metrics.goalReached).toBe(true)
-    expect(metrics.goalDistance).toBeCloseTo(0.4)
+    expect(metrics.goalDistance).toBeCloseTo(0.18)
     expect(metrics.timeToGoal).toBe(0)
   })
 

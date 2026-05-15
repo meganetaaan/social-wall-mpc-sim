@@ -32,7 +32,7 @@ const defaultWallTargetDistance = 0.85
 
 const baseEnvironment: Environment = {
   goal: { x: 7.1, y: 2.7 },
-  goalRadius: 0.45,
+  goalRadius: 0.2,
   walls: [
     { id: 'follow-wall-start', a: { x: 0.3, y: 0.2 }, b: { x: 2.4, y: 0.2 } },
     { id: 'lower-alcove-left', a: { x: 2.4, y: 0.2 }, b: { x: 2.4, y: 0.95 } },

@@ -1,7 +1,7 @@
 import { distance } from './math'
 import type { Environment, RobotState } from './types'
 
-export const defaultGoalRadius = 0.45
+export const defaultGoalRadius = 0.2
 
 export function goalRadius(environment: Environment) {
   return environment.goalRadius ?? defaultGoalRadius

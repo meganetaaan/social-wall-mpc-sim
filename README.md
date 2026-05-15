@@ -82,7 +82,7 @@ The baselines are comparison tools, not alternative proposed methods. They inten
 
 ## Goal reaching
 
-The green marker is testable state, not just a visual target. `Environment.goalRadius` defines the arrival threshold; if a scenario omits it, the simulator uses a default radius of `0.45m`. The default scenario sets the same threshold explicitly.
+The green marker is testable state, not just a visual target. `Environment.goalRadius` defines the arrival threshold; if a scenario omits it, the simulator uses a stricter default radius of `0.20m`. The default scenario sets the same threshold explicitly, so arrival requires the robot center to approach the green marker closely rather than merely entering a broad visual ring.
 
 Goal arrival means the robot center is within that radius of `Environment.goal`. Once reached, `goalReached` stays true and `timeToGoal` records the first simulated arrival time. The simulator also tracks current `goalDistance` and `bestGoalDistance`.
 

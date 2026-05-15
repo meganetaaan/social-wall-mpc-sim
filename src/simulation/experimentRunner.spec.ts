@@ -25,8 +25,9 @@ describe('headless experiment runner', () => {
     expect(result.reachedGoal).toBe(true)
     expect(result.timeToGoal).not.toBeNull()
     expect(result.steps).toBeLessThanOrEqual(700)
-    expect(result.finalGoalDistance).toBeLessThanOrEqual(0.45)
-  }, 10_000)
+    expect(result.finalGoalDistance).toBeLessThanOrEqual(0.2)
+    expect(result.bestGoalDistance).toBeLessThanOrEqual(0.2)
+  }, 35_000)
 
   it('keeps a meaningful baseline comparison against wall-only', () => {
     const beliefMpc = runScenarioExperiment({
