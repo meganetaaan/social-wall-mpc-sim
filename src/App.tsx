@@ -8,6 +8,7 @@ import { stepSimulation } from './simulation/simulator'
 import type { PlannerMode, PlannerParameters, SimulationState } from './simulation/types'
 import { Controls } from './ui/Controls'
 import { CostPanel } from './ui/CostPanel'
+import { ExperimentSummaryPanel } from './ui/ExperimentSummaryPanel'
 import { ParameterPanel } from './ui/ParameterPanel'
 
 export default function App() {
@@ -89,6 +90,7 @@ export default function App() {
           </section>
           <ParameterPanel parameters={parameters} onChange={setParameters} />
           <CostPanel cost={state.costBreakdown} state={state} />
+          <ExperimentSummaryPanel parameters={parameters} />
         </aside>
       </div>
     </main>

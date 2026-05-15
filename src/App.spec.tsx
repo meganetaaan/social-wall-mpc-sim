@@ -14,5 +14,7 @@ describe('App', () => {
     expect(screen.getByText(/unified stage-cost breakdown/i)).toBeInTheDocument()
     expect(screen.getByText(/goal distance/i)).toBeInTheDocument()
     expect(screen.getByText(/goal reached/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /run comparison/i })).toBeInTheDocument()
+    expect(screen.getByText(/deterministic headless replay/i)).toBeInTheDocument()
   })
 })

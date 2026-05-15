@@ -13,6 +13,33 @@ export type ScenarioExperimentResult = {
   steps: number
 }
 
+export type ScenarioExperimentSummary = {
+  scenarioId: ScenarioId
+  scenarioName: string
+  plannerMode: PlannerMode
+  reachedGoal: boolean
+  timeToGoal: number | null
+  finalGoalDistance: number
+  bestGoalDistance: number
+  steps: number
+  elapsedTime: number
+  minHumanDistance: number
+  socialViolationCount: number
+  nearCollisionCount: number
+  stopDuration: number
+  meanWallDistanceError: number
+  maxWallDistanceError: number
+  uncertaintyTrace: number
+  estimatedMapCoverage: number
+}
+
+export type ScenarioBatchExperimentResult = {
+  maxSteps: number
+  summaries: ScenarioExperimentSummary[]
+}
+
+const defaultPlannerModes: PlannerMode[] = ['belief-mpc', 'wall-only', 'reactive-stop']
+
 export function runScenarioExperiment(args: {
   scenarioId: ScenarioId
   plannerMode?: PlannerMode
@@ -42,4 +69,62 @@ export function runScenarioExperiment(args: {
     bestGoalDistance: state.metrics.bestGoalDistance,
     steps,
   }
+}
+
+export function summarizeScenarioExperiment(
+  result: ScenarioExperimentResult,
+  scenarioId: ScenarioId,
+  scenarioName: string,
+  plannerMode: PlannerMode,
+): ScenarioExperimentSummary {
+  const metrics = result.finalState.metrics
+  return {
+    scenarioId,
+    scenarioName,
+    plannerMode,
+    reachedGoal: result.reachedGoal,
+    timeToGoal: result.timeToGoal,
+    finalGoalDistance: finiteNumber(result.finalGoalDistance),
+    bestGoalDistance: finiteNumber(result.bestGoalDistance),
+    steps: result.steps,
+    elapsedTime: finiteNumber(metrics.elapsedTime),
+    minHumanDistance: finiteNumber(metrics.minHumanDistance),
+    socialViolationCount: metrics.socialViolationCount,
+    nearCollisionCount: metrics.nearCollisionCount,
+    stopDuration: finiteNumber(metrics.stopDuration),
+    meanWallDistanceError: finiteNumber(metrics.meanWallDistanceError),
+    maxWallDistanceError: finiteNumber(metrics.maxWallDistanceError),
+    uncertaintyTrace: finiteNumber(metrics.uncertaintyTrace),
+    estimatedMapCoverage: finiteNumber(metrics.estimatedMapCoverage),
+  }
+}
+
+export function runScenarioBatch(args: {
+  scenarioIds?: readonly ScenarioId[]
+  plannerModes?: readonly PlannerMode[]
+  parameters?: Partial<PlannerParameters>
+  maxSteps: number
+}): ScenarioBatchExperimentResult {
+  const scenarioIds = args.scenarioIds ?? scenarioDefinitions.map((scenario) => scenario.id)
+  const plannerModes = args.plannerModes ?? defaultPlannerModes
+  const summaries = scenarioIds.flatMap((scenarioId) => {
+    const scenario = scenarioDefinitions.find((candidate) => candidate.id === scenarioId)
+    if (!scenario) throw new Error(`Unknown scenario: ${scenarioId}`)
+
+    return plannerModes.map((plannerMode) => {
+      const result = runScenarioExperiment({
+        scenarioId,
+        plannerMode,
+        parameters: args.parameters,
+        maxSteps: args.maxSteps,
+      })
+      return summarizeScenarioExperiment(result, scenario.id, scenario.name, plannerMode)
+    })
+  })
+
+  return { maxSteps: args.maxSteps, summaries }
+}
+
+function finiteNumber(value: number): number {
+  return Number.isFinite(value) ? value : 0
 }

@@ -80,6 +80,28 @@ The policy selector compares three modes:
 
 The baselines are comparison tools, not alternative proposed methods. They intentionally separate simple behaviors so the unified-cost formulation can be evaluated against predictable reference policies.
 
+## Experiment comparison
+
+The app includes a **Run comparison** button below the live metric panel. It runs deterministic headless replays in the browser with the same `stepSimulation` code used by the canvas animation, then shows one row per scenario and policy. The table is meant for quick side-by-side checks: lower social violations and near collisions are better, lower best goal distance means the robot got closer to the goal, and goal/time indicate whether the local receding-horizon controller reached the marker within the step bound.
+
+The headless API is also exported from `src/simulation/experimentRunner.ts` as `runScenarioBatch`, which defaults to every scenario and the three policy modes. The UI uses a focused batch of `crossing-human`, `standing-human`, and `blocked-corridor` with `maxSteps: 240`.
+
+Measured local batch results with default planner parameters and `maxSteps: 240`:
+
+| Scenario | Policy | Goal | Time | Best goal dist | Min human dist | Social violations | Near collisions | Stop duration |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Crossing human | belief-mpc | no | - | 0.21m | 0.91m | 0 | 0 | 15.8s |
+| Crossing human | wall-only | yes | 23.8s | 0.20m | 0.09m | 20 | 0 | 0.0s |
+| Crossing human | reactive-stop | no | - | 0.29m | 0.46m | 34 | 0 | 5.3s |
+| Standing human | belief-mpc | no | - | 0.24m | 0.98m | 0 | 0 | 17.5s |
+| Standing human | wall-only | yes | 23.6s | 0.17m | 1.16m | 0 | 0 | 0.0s |
+| Standing human | reactive-stop | yes | 23.6s | 0.17m | 1.16m | 0 | 0 | 0.0s |
+| Blocked corridor | belief-mpc | no | - | 6.29m | 0.96m | 0 | 0 | 28.8s |
+| Blocked corridor | wall-only | yes | 23.8s | 0.20m | 0.14m | 26 | 15 | 0.0s |
+| Blocked corridor | reactive-stop | no | - | 6.18m | 0.85m | 0 | 0 | 28.3s |
+
+These numbers are deterministic for the fixed scenarios, seeds, parameters, and step bound, but they are not a benchmark suite. The optimizer is sample-based with fixed seeds, human prediction is simplified, the belief update is a compact approximation rather than SLAM, and the selected scenarios are small regression cases for this simulator.
+
 ## Goal reaching
 
 The green marker is testable state, not just a visual target. `Environment.goalRadius` defines the arrival threshold; if a scenario omits it, the simulator uses a stricter default radius of `0.20m`. The default scenario sets the same threshold explicitly, so arrival requires the robot center to approach the green marker closely rather than merely entering a broad visual ring.

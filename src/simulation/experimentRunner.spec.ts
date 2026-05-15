@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { runScenarioExperiment } from './experimentRunner'
+import { runScenarioBatch, runScenarioExperiment } from './experimentRunner'
 
 const fastParams = { sampleCount: 12, horizonSteps: 6 }
 
@@ -47,6 +47,83 @@ describe('headless experiment runner', () => {
     expect(
       wallOnly.reachedGoal ||
         wallOnly.finalState.metrics.socialViolationCount >= beliefMpc.finalState.metrics.socialViolationCount,
+    ).toBe(true)
+  })
+
+  it('runs a deterministic ordered batch for scenario and policy combinations', () => {
+    const args = {
+      scenarioIds: ['crossing-human', 'standing-human'] as const,
+      plannerModes: ['belief-mpc', 'wall-only', 'reactive-stop'] as const,
+      parameters: { sampleCount: 8, horizonSteps: 5 },
+      maxSteps: 80,
+    }
+
+    const first = runScenarioBatch(args)
+    const second = runScenarioBatch(args)
+
+    expect(first.maxSteps).toBe(args.maxSteps)
+    expect(first.summaries).toHaveLength(args.scenarioIds.length * args.plannerModes.length)
+    expect(first).toEqual(second)
+    expect(first.summaries.map((summary) => [summary.scenarioId, summary.plannerMode])).toEqual([
+      ['crossing-human', 'belief-mpc'],
+      ['crossing-human', 'wall-only'],
+      ['crossing-human', 'reactive-stop'],
+      ['standing-human', 'belief-mpc'],
+      ['standing-human', 'wall-only'],
+      ['standing-human', 'reactive-stop'],
+    ])
+  })
+
+  it('summarizes batch rows with readable labels and finite numeric metrics', () => {
+    const result = runScenarioBatch({
+      scenarioIds: ['crossing-human'],
+      plannerModes: ['belief-mpc'],
+      parameters: { sampleCount: 8, horizonSteps: 5 },
+      maxSteps: 40,
+    })
+    const [summary] = result.summaries
+
+    expect(summary.scenarioName).toBe('Crossing human')
+    expect(summary.plannerMode).toBe('belief-mpc')
+
+    const numericValues = [
+      summary.finalGoalDistance,
+      summary.bestGoalDistance,
+      summary.steps,
+      summary.elapsedTime,
+      summary.minHumanDistance,
+      summary.socialViolationCount,
+      summary.nearCollisionCount,
+      summary.stopDuration,
+      summary.meanWallDistanceError,
+      summary.maxWallDistanceError,
+      summary.uncertaintyTrace,
+      summary.estimatedMapCoverage,
+    ]
+
+    expect(numericValues.every((value) => Number.isFinite(value))).toBe(true)
+    if (summary.timeToGoal !== null) {
+      expect(Number.isFinite(summary.timeToGoal)).toBe(true)
+    }
+  })
+
+  it('keeps belief-mpc meaningfully comparable to a baseline in a focused batch', () => {
+    const result = runScenarioBatch({
+      scenarioIds: ['crossing-human'],
+      plannerModes: ['belief-mpc', 'wall-only'],
+      parameters: { sampleCount: 8, horizonSteps: 5 },
+      maxSteps: 120,
+    })
+    const beliefMpc = result.summaries.find((summary) => summary.plannerMode === 'belief-mpc')
+    const wallOnly = result.summaries.find((summary) => summary.plannerMode === 'wall-only')
+
+    expect(beliefMpc).toBeDefined()
+    expect(wallOnly).toBeDefined()
+    if (!beliefMpc || !wallOnly) throw new Error('Missing focused comparison rows')
+    expect(
+      beliefMpc.reachedGoal ||
+        beliefMpc.socialViolationCount <= wallOnly.socialViolationCount ||
+        beliefMpc.bestGoalDistance < wallOnly.bestGoalDistance,
     ).toBe(true)
   })
 })
