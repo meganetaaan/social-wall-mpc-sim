@@ -11,7 +11,7 @@ export function stepSimulation(
   const plan = planSamplingMpc({ state, parameters, seed: seed + Math.floor(state.time * 1000) })
   const robot = stepRobot(state.robot, plan.bestControl, parameters.dt)
   const humans = predictHumans(state.humans, parameters.dt)
-  const belief = updateBelief(state.belief, robot, state.environment, parameters)
+  const belief = updateBelief(state.belief, robot, state.environment, parameters, state.time + parameters.dt)
   const trace = [...state.trace, { x: robot.x, y: robot.y }].slice(-650)
   return {
     ...state,

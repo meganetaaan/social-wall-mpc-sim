@@ -6,7 +6,13 @@ import { evaluateStageCost, humanSocialDistanceCost, wallFollowingCost } from '.
 const wall: WallSegment = { id: 'north-wall', a: { x: 0, y: 0 }, b: { x: 10, y: 0 } }
 const robot: RobotState = { x: 1, y: 1, theta: 0 }
 const control: ControlInput = { v: 0.6, omega: 0 }
-const belief: BeliefState = { sigmaX: 0.1, sigmaY: 0.2, sigmaTheta: 0.05, mapConfidence: 0.9 }
+const belief: BeliefState = {
+  sigmaX: 0.1,
+  sigmaY: 0.2,
+  sigmaTheta: 0.05,
+  mapConfidence: 0.9,
+  wallBeliefs: [{ wallId: 'north-wall', confidence: 0.9, lastObservedAt: 0 }],
+}
 
 describe('modular MPC cost terms', () => {
   it('keeps wall distance and heading costs inspectable', () => {
@@ -48,10 +54,13 @@ describe('modular MPC cost terms', () => {
       'collision',
       'control',
       'human',
+      'mapUncertainty',
+      'observationGain',
       'progress',
       'smoothness',
       'uncertainty',
       'wall',
+      'wallBeliefConsistency',
       'wallHeading',
     ])
     expect(breakdown.total).toBeGreaterThan(0)

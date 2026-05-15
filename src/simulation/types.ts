@@ -3,9 +3,16 @@ export type RobotState = { x: number; y: number; theta: number }
 export type ControlInput = { v: number; omega: number }
 export type HumanState = { id: string; x: number; y: number; vx: number; vy: number; radius: number }
 export type WallSegment = { id: string; a: Vec2; b: Vec2 }
+export type WallBelief = { wallId: string; confidence: number; lastObservedAt: number }
 export type StaticObstacle = { id: string; x: number; y: number; radius: number }
 export type Environment = { walls: WallSegment[]; obstacles: StaticObstacle[]; goal: Vec2 }
-export type BeliefState = { sigmaX: number; sigmaY: number; sigmaTheta: number; mapConfidence: number }
+export type BeliefState = {
+  sigmaX: number
+  sigmaY: number
+  sigmaTheta: number
+  mapConfidence: number
+  wallBeliefs: WallBelief[]
+}
 export type CostTerms = {
   wall: number
   wallHeading: number
@@ -15,6 +22,9 @@ export type CostTerms = {
   smoothness: number
   progress: number
   uncertainty: number
+  mapUncertainty: number
+  observationGain: number
+  wallBeliefConsistency: number
 }
 export type CostBreakdown = { terms: CostTerms; total: number }
 export type PlannerParameters = {

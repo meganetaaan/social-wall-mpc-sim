@@ -12,7 +12,19 @@ import type {
 import { addCost, evaluateStageCost } from './cost'
 
 const zeroCost = () => ({
-  terms: { wall: 0, wallHeading: 0, human: 0, collision: 0, control: 0, smoothness: 0, progress: 0, uncertainty: 0 },
+  terms: {
+    wall: 0,
+    wallHeading: 0,
+    human: 0,
+    collision: 0,
+    control: 0,
+    smoothness: 0,
+    progress: 0,
+    uncertainty: 0,
+    mapUncertainty: 0,
+    observationGain: 0,
+    wallBeliefConsistency: 0,
+  },
   total: 0,
 })
 

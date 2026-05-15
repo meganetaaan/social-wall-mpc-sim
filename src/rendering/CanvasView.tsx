@@ -20,6 +20,7 @@ export function CanvasView({ state, dMin, dPref }: Props) {
       width: rect.width,
       height: rect.height,
       environment: state.environment,
+      belief: state.belief,
       robot: state.robot,
       humans: state.humans,
       trace: state.trace,

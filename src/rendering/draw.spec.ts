@@ -61,4 +61,35 @@ describe('drawScene', () => {
     expect(calls).toContain('fillStyle:#22c55e')
     expect(calls).toContain('fillText:GOAL')
   })
+
+  it('draws wall map confidence as a belief layer', () => {
+    const { ctx, calls } = createRecordingContext()
+
+    drawScene({
+      ctx,
+      width: 800,
+      height: 480,
+      environment: {
+        goal: { x: 8.9, y: 3.85 },
+        walls: [{ id: 'wall', a: { x: 0, y: 0 }, b: { x: 10, y: 0 } }],
+        obstacles: [],
+      },
+      belief: {
+        sigmaX: 0.1,
+        sigmaY: 0.1,
+        sigmaTheta: 0.02,
+        mapConfidence: 0.24,
+        wallBeliefs: [{ wallId: 'wall', confidence: 0.24, lastObservedAt: 0 }],
+      },
+      robot: { x: 1, y: 1, theta: 0 },
+      humans: [],
+      trace: [],
+      candidates: [],
+      dMin: 0.7,
+      dPref: 1.5,
+    })
+
+    expect(calls).toContain('fillText:map belief')
+    expect(calls.some((call) => call.startsWith('strokeStyle:rgba(125, 211, 252'))).toBe(true)
+  })
 })

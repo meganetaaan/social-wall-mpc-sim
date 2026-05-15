@@ -27,7 +27,19 @@ export const defaultParameters: PlannerParameters = {
 }
 
 const emptyCost: CostBreakdown = {
-  terms: { wall: 0, wallHeading: 0, human: 0, collision: 0, control: 0, smoothness: 0, progress: 0, uncertainty: 0 },
+  terms: {
+    wall: 0,
+    wallHeading: 0,
+    human: 0,
+    collision: 0,
+    control: 0,
+    smoothness: 0,
+    progress: 0,
+    uncertainty: 0,
+    mapUncertainty: 0,
+    observationGain: 0,
+    wallBeliefConsistency: 0,
+  },
   total: 0,
 }
 const emptyPlan: PlanningResult = {
@@ -62,7 +74,25 @@ export function createDefaultSimulationState(): SimulationState {
       ],
       obstacles: [{ id: 'pillar', x: 7.7, y: 2.15, radius: 0.25 }],
     },
-    belief: { sigmaX: 0.12, sigmaY: 0.12, sigmaTheta: 0.04, mapConfidence: 0.86 },
+    belief: {
+      sigmaX: 0.12,
+      sigmaY: 0.12,
+      sigmaTheta: 0.04,
+      mapConfidence: 0.38,
+      wallBeliefs: [
+        { wallId: 'follow-wall-start', confidence: 0.72, lastObservedAt: 0 },
+        { wallId: 'lower-alcove-left', confidence: 0.32, lastObservedAt: -1 },
+        { wallId: 'lower-alcove-back', confidence: 0.24, lastObservedAt: -1 },
+        { wallId: 'lower-alcove-right', confidence: 0.2, lastObservedAt: -1 },
+        { wallId: 'follow-wall-middle', confidence: 0.28, lastObservedAt: -1 },
+        { wallId: 'inner-baffle', confidence: 0.18, lastObservedAt: -1 },
+        { wallId: 'upper-bend', confidence: 0.16, lastObservedAt: -1 },
+        { wallId: 'right-wall', confidence: 0.14, lastObservedAt: -1 },
+        { wallId: 'top-wall', confidence: 0.12, lastObservedAt: -1 },
+        { wallId: 'upper-pocket', confidence: 0.12, lastObservedAt: -1 },
+        { wallId: 'left-short-wall', confidence: 0.34, lastObservedAt: -1 },
+      ],
+    },
     trace: [{ x: 1.0, y: 0.86 }],
     plan: emptyPlan,
     costBreakdown: emptyCost,

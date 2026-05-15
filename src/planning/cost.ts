@@ -1,4 +1,4 @@
-import { traceSigma, updateBelief } from '../belief/simpleBelief'
+import { mapUncertaintyTrace, traceSigma, updateBelief, wallConfidence } from '../belief/simpleBelief'
 import { distance, nearestWall, normAngle, wallTangentAngle } from '../simulation/math'
 import type {
   BeliefState,
@@ -20,6 +20,9 @@ const emptyTerms = () => ({
   smoothness: 0,
   progress: 0,
   uncertainty: 0,
+  mapUncertainty: 0,
+  observationGain: 0,
+  wallBeliefConsistency: 0,
 })
 
 export function wallFollowingCost(robot: RobotState, wall: WallSegment, p: PlannerParameters) {
@@ -86,7 +89,35 @@ export function evaluateStageCost(args: {
     parameters.wSmooth * ((control.v - previousControl.v) ** 2 + (control.omega - previousControl.omega) ** 2)
   terms.progress = -parameters.wProgress * control.v * Math.cos(normAngle(robot.theta - wallTangentAngle(nearest.wall)))
   terms.uncertainty = parameters.wUncertainty * traceSigma(belief)
+  terms.mapUncertainty = parameters.wUncertainty * mapUncertaintyTrace(belief)
+  terms.observationGain = -expectedObservationGain(robot, control, environment, belief, parameters)
+  terms.wallBeliefConsistency = wallBeliefConsistencyCost(robot, environment, belief, parameters)
   return { terms, total: Object.values(terms).reduce((sum, value) => sum + value, 0) }
+}
+
+export function expectedObservationGain(
+  robot: RobotState,
+  control: ControlInput,
+  environment: Environment,
+  belief: BeliefState,
+  p: PlannerParameters,
+) {
+  const nearest = nearestWall({ x: robot.x, y: robot.y }, environment.walls)
+  const confidenceGap = 1 - wallConfidence(belief, nearest.wall.id)
+  const sensorOpportunity = Math.max(0, 1 - nearest.distance / 1.8)
+  const lookingAlongWall = Math.max(0, Math.cos(normAngle(robot.theta - wallTangentAngle(nearest.wall))))
+  return p.wUncertainty * 0.45 * confidenceGap * sensorOpportunity * (0.4 + control.v) * (0.4 + lookingAlongWall)
+}
+
+export function wallBeliefConsistencyCost(
+  robot: RobotState,
+  environment: Environment,
+  belief: BeliefState,
+  p: PlannerParameters,
+) {
+  const nearest = nearestWall({ x: robot.x, y: robot.y }, environment.walls)
+  const confidenceGap = 1 - wallConfidence(belief, nearest.wall.id)
+  return p.wUncertainty * confidenceGap * (nearest.distance - p.dWallTarget) ** 2
 }
 
 export function addCost(a: CostBreakdown, b: CostBreakdown): CostBreakdown {

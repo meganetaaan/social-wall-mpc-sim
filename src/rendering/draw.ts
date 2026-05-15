@@ -1,4 +1,4 @@
-import type { CandidateRollout, Environment, HumanState, RobotState, Vec2 } from '../simulation/types'
+import type { BeliefState, CandidateRollout, Environment, HumanState, RobotState, Vec2 } from '../simulation/types'
 
 type Transform = { scale: number; offsetX: number; offsetY: number; height: number }
 const worldToCanvas = (p: Vec2, t: Transform): Vec2 => ({
@@ -11,6 +11,7 @@ export function drawScene(args: {
   width: number
   height: number
   environment: Environment
+  belief?: BeliefState
   robot: RobotState
   humans: HumanState[]
   trace: Vec2[]
@@ -45,7 +46,7 @@ export function drawScene(args: {
 
   ctx.lineCap = 'round'
   ctx.lineWidth = 8
-  ctx.strokeStyle = '#94a3b8'
+  ctx.strokeStyle = 'rgba(148, 163, 184, 0.32)'
   for (const wall of args.environment.walls) {
     const a = worldToCanvas(wall.a, transform)
     const b = worldToCanvas(wall.b, transform)
@@ -53,6 +54,23 @@ export function drawScene(args: {
     ctx.moveTo(a.x, a.y)
     ctx.lineTo(b.x, b.y)
     ctx.stroke()
+  }
+
+  if (args.belief) {
+    ctx.lineWidth = 5
+    for (const wall of args.environment.walls) {
+      const confidence = args.belief.wallBeliefs.find((candidate) => candidate.wallId === wall.id)?.confidence ?? 0
+      const a = worldToCanvas(wall.a, transform)
+      const b = worldToCanvas(wall.b, transform)
+      ctx.strokeStyle = `rgba(125, 211, 252, ${Math.max(0.12, confidence).toFixed(2)})`
+      ctx.beginPath()
+      ctx.moveTo(a.x, a.y)
+      ctx.lineTo(b.x, b.y)
+      ctx.stroke()
+    }
+    ctx.fillStyle = '#bae6fd'
+    ctx.font = '12px Inter, sans-serif'
+    ctx.fillText('map belief', 32, 24)
   }
 
   for (const obstacle of args.environment.obstacles) {
