@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { poseGaussianFromSigmas } from '../belief/poseBelief'
 import { defaultParameters } from '../simulation/environment'
 import type { BeliefState, ControlInput, HumanState, RobotState, WallSegment } from '../simulation/types'
 import { evaluateStageCost, humanSocialDistanceCost, wallFollowingCost } from './cost'
@@ -7,6 +8,7 @@ const wall: WallSegment = { id: 'north-wall', a: { x: 0, y: 0 }, b: { x: 10, y: 
 const robot: RobotState = { x: 1, y: 1, theta: 0 }
 const control: ControlInput = { v: 0.6, omega: 0 }
 const belief: BeliefState = {
+  pose: poseGaussianFromSigmas(robot, 0.1, 0.2, 0.05),
   sigmaX: 0.1,
   sigmaY: 0.2,
   sigmaTheta: 0.05,

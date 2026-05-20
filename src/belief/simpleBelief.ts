@@ -1,5 +1,19 @@
-import { nearestWall } from '../simulation/math'
-import type { BeliefState, Environment, PlannerParameters, RobotState, WallBelief } from '../simulation/types'
+import { nearestWall, normAngle } from '../simulation/math'
+import type {
+  BeliefState,
+  Environment,
+  PlannerParameters,
+  PoseGaussian,
+  RobotState,
+  WallBelief,
+} from '../simulation/types'
+import {
+  correctPoseGaussianWithObservation,
+  poseGaussianFromSigmas,
+  propagatePoseGaussian,
+  sigmasFromPoseGaussian,
+  tracePoseCovariance,
+} from './poseBelief'
 import {
   computeMapUncertainty,
   estimatedWallConfidence,
@@ -17,6 +31,18 @@ function completeWallBeliefs(belief: BeliefState, environment: Environment): Wal
   })
 }
 
+function normalizePoseBelief(belief: BeliefState, robot: RobotState): PoseGaussian {
+  return belief.pose ?? poseGaussianFromSigmas(robot, belief.sigmaX, belief.sigmaY, belief.sigmaTheta)
+}
+
+function inferControl(previous: RobotState, robot: RobotState, dt: number) {
+  const safeDt = Math.max(0.001, Math.abs(dt))
+  return {
+    v: Math.hypot(robot.x - previous.x, robot.y - previous.y) / safeDt,
+    omega: normAngle(robot.theta - previous.theta) / safeDt,
+  }
+}
+
 export function updateBelief(
   belief: BeliefState,
   robot: RobotState,
@@ -26,8 +52,13 @@ export function updateBelief(
 ): BeliefState {
   const nearest = nearestWall({ x: robot.x, y: robot.y }, environment.walls)
   const observationStrength = Math.max(0, 1 - nearest.distance / 2.2)
-  const motionGrowth = 0.006 + Math.abs(parameters.dt) * 0.004
-  const correction = 0.02 * observationStrength
+  const pose = normalizePoseBelief(belief, robot)
+  const propagatedPose = propagatePoseGaussian(pose, inferControl(pose.mean, robot, parameters.dt), parameters)
+  const correctedPose = correctPoseGaussianWithObservation(
+    { ...propagatedPose, mean: { ...robot } },
+    observationStrength,
+  )
+  const sigmas = sigmasFromPoseGaussian(correctedPose)
   const observations = observeWalls(robot, environment, parameters)
   const estimatedWalls = updateEstimatedWallBelief(
     initializeEstimatedWallBelief(environment, belief),
@@ -49,16 +80,16 @@ export function updateBelief(
   })
   const mapConfidence = 1 - computeMapUncertainty(estimatedWalls)
   return {
-    sigmaX: Math.max(0.02, belief.sigmaX + motionGrowth - correction),
-    sigmaY: Math.max(0.02, belief.sigmaY + motionGrowth - correction),
-    sigmaTheta: Math.max(0.01, belief.sigmaTheta + motionGrowth * 0.5 - correction * 0.35),
+    pose: correctedPose,
+    ...sigmas,
     mapConfidence,
     wallBeliefs,
     estimatedWalls,
   }
 }
 
-export const traceSigma = (belief: BeliefState) => belief.sigmaX + belief.sigmaY + belief.sigmaTheta
+export const traceSigma = (belief: BeliefState) =>
+  belief.pose ? tracePoseCovariance(belief.pose) : belief.sigmaX + belief.sigmaY + belief.sigmaTheta
 
 export const mapUncertaintyTrace = (belief: BeliefState) => {
   if (belief.estimatedWalls.length > 0) return computeMapUncertainty(belief.estimatedWalls)

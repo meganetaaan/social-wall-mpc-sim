@@ -1,3 +1,4 @@
+import { tracePoseCovariance } from '../belief/poseBelief'
 import { goalDistance, goalRadius, isGoalReached } from './goal'
 import { distance, length, nearestWall, sub, wallTangentAngle } from './math'
 import type {
@@ -120,5 +121,5 @@ function minHumanDistance(robot: RobotState, humans: HumanState[]) {
 }
 
 function uncertaintyTrace(belief: BeliefState) {
-  return belief.sigmaX + belief.sigmaY + belief.sigmaTheta
+  return belief.pose ? tracePoseCovariance(belief.pose) : belief.sigmaX + belief.sigmaY + belief.sigmaTheta
 }

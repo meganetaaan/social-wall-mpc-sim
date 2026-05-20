@@ -1,6 +1,11 @@
 export type Vec2 = { x: number; y: number }
 export type RobotState = { x: number; y: number; theta: number }
 export type ControlInput = { v: number; omega: number }
+export type PoseCovariance = [[number, number, number], [number, number, number], [number, number, number]]
+export type PoseGaussian = {
+  mean: RobotState
+  covariance: PoseCovariance
+}
 export type HumanMotionPattern =
   | { kind: 'linear' }
   | { kind: 'follow-robot'; distanceBehind: number; lateralOffset: number; speed: number }
@@ -35,6 +40,7 @@ export type WallObservation = {
 export type StaticObstacle = { id: string; x: number; y: number; radius: number }
 export type Environment = { walls: WallSegment[]; obstacles: StaticObstacle[]; goal: Vec2; goalRadius?: number }
 export type BeliefState = {
+  pose: PoseGaussian
   sigmaX: number
   sigmaY: number
   sigmaTheta: number

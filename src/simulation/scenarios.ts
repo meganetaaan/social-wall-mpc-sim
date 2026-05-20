@@ -1,3 +1,4 @@
+import { poseGaussianFromSigmas } from '../belief/poseBelief'
 import { createInitialMetrics } from './metrics'
 import type {
   BeliefState,
@@ -34,6 +35,7 @@ export type ScenarioDefinition = {
 }
 
 const defaultWallTargetDistance = 0.85
+const defaultPoseMean: RobotState = { x: 0, y: 0, theta: 0 }
 
 const baseEnvironment: Environment = {
   goal: { x: 7.1, y: 2.7 },
@@ -71,58 +73,80 @@ const bendEnvironment: Environment = {
   obstacles: [{ id: 'bend-pillar', x: 7.7, y: 1.85, radius: 0.28 }],
 }
 
-const scenarioBelief = (environment: Environment, firstWallCoverage = { tMin: 0.18, tMax: 0.46 }): BeliefState => ({
-  sigmaX: 0.12,
-  sigmaY: 0.12,
-  sigmaTheta: 0.04,
-  mapConfidence: 0.38,
-  wallBeliefs: environment.walls.map((wall, index) => ({
-    wallId: wall.id,
-    confidence: index === 0 ? 0.72 : Math.max(0.12, 0.34 - index * 0.02),
-    lastObservedAt: index === 0 ? 0 : -1,
-  })),
-  estimatedWalls: environment.walls.map((wall, index) => ({
-    wallId: wall.id,
-    tMin: index === 0 ? firstWallCoverage.tMin : 0,
-    tMax: index === 0 ? firstWallCoverage.tMax : 0,
-    confidence: index === 0 ? 0.72 : 0,
-    lastObservedAt: index === 0 ? 0 : -1,
-  })),
-})
+const scenarioBelief = (
+  environment: Environment,
+  firstWallCoverage = { tMin: 0.18, tMax: 0.46 },
+  mean = defaultPoseMean,
+): BeliefState => {
+  const sigmaX = 0.12
+  const sigmaY = 0.12
+  const sigmaTheta = 0.04
+  return {
+    pose: poseGaussianFromSigmas(mean, sigmaX, sigmaY, sigmaTheta),
+    sigmaX,
+    sigmaY,
+    sigmaTheta,
+    mapConfidence: 0.38,
+    wallBeliefs: environment.walls.map((wall, index) => ({
+      wallId: wall.id,
+      confidence: index === 0 ? 0.72 : Math.max(0.12, 0.34 - index * 0.02),
+      lastObservedAt: index === 0 ? 0 : -1,
+    })),
+    estimatedWalls: environment.walls.map((wall, index) => ({
+      wallId: wall.id,
+      tMin: index === 0 ? firstWallCoverage.tMin : 0,
+      tMax: index === 0 ? firstWallCoverage.tMax : 0,
+      confidence: index === 0 ? 0.72 : 0,
+      lastObservedAt: index === 0 ? 0 : -1,
+    })),
+  }
+}
 
-const knownMapBelief = (environment: Environment): BeliefState => ({
-  sigmaX: 0.08,
-  sigmaY: 0.08,
-  sigmaTheta: 0.03,
-  mapConfidence: 0.86,
-  wallBeliefs: environment.walls.map((wall) => ({ wallId: wall.id, confidence: 0.88, lastObservedAt: 0 })),
-  estimatedWalls: environment.walls.map((wall) => ({
-    wallId: wall.id,
-    tMin: 0,
-    tMax: 1,
-    confidence: 0.88,
-    lastObservedAt: 0,
-  })),
-})
+const knownMapBelief = (environment: Environment, mean: RobotState = { x: 0.85, y: 0.82, theta: 0 }): BeliefState => {
+  const sigmaX = 0.08
+  const sigmaY = 0.08
+  const sigmaTheta = 0.03
+  return {
+    pose: poseGaussianFromSigmas(mean, sigmaX, sigmaY, sigmaTheta),
+    sigmaX,
+    sigmaY,
+    sigmaTheta,
+    mapConfidence: 0.86,
+    wallBeliefs: environment.walls.map((wall) => ({ wallId: wall.id, confidence: 0.88, lastObservedAt: 0 })),
+    estimatedWalls: environment.walls.map((wall) => ({
+      wallId: wall.id,
+      tMin: 0,
+      tMax: 1,
+      confidence: 0.88,
+      lastObservedAt: 0,
+    })),
+  }
+}
 
-const unknownMapBelief = (environment: Environment): BeliefState => ({
-  sigmaX: 0.18,
-  sigmaY: 0.18,
-  sigmaTheta: 0.08,
-  mapConfidence: 0.12,
-  wallBeliefs: environment.walls.map((wall, index) => ({
-    wallId: wall.id,
-    confidence: index === 0 ? 0.32 : 0.04,
-    lastObservedAt: index === 0 ? 0 : -1,
-  })),
-  estimatedWalls: environment.walls.map((wall, index) => ({
-    wallId: wall.id,
-    tMin: index === 0 ? 0.08 : 0,
-    tMax: index === 0 ? 0.22 : 0,
-    confidence: index === 0 ? 0.32 : 0,
-    lastObservedAt: index === 0 ? 0 : -1,
-  })),
-})
+const unknownMapBelief = (environment: Environment, mean: RobotState = { x: 0.85, y: 0.82, theta: 0 }): BeliefState => {
+  const sigmaX = 0.18
+  const sigmaY = 0.18
+  const sigmaTheta = 0.08
+  return {
+    pose: poseGaussianFromSigmas(mean, sigmaX, sigmaY, sigmaTheta),
+    sigmaX,
+    sigmaY,
+    sigmaTheta,
+    mapConfidence: 0.12,
+    wallBeliefs: environment.walls.map((wall, index) => ({
+      wallId: wall.id,
+      confidence: index === 0 ? 0.32 : 0.04,
+      lastObservedAt: index === 0 ? 0 : -1,
+    })),
+    estimatedWalls: environment.walls.map((wall, index) => ({
+      wallId: wall.id,
+      tMin: index === 0 ? 0.08 : 0,
+      tMax: index === 0 ? 0.22 : 0,
+      confidence: index === 0 ? 0.32 : 0,
+      lastObservedAt: index === 0 ? 0 : -1,
+    })),
+  }
+}
 
 const spiralEnvironment: Environment = {
   goal: { x: 5.0, y: 2.5 },
@@ -197,7 +221,8 @@ export const scenarioDefinitions: ScenarioDefinition[] = [
     initialRobot: { x: 0.95, y: 0.88, theta: 0 },
     humans: [{ id: 'bend-human', x: 5.6, y: 2.25, vx: 0.04, vy: -0.06, radius: 0.23 }],
     environment: bendEnvironment,
-    initialBelief: (environment) => scenarioBelief(environment, { tMin: 0.05, tMax: 0.24 }),
+    initialBelief: (environment) =>
+      scenarioBelief(environment, { tMin: 0.05, tMax: 0.24 }, { x: 0.95, y: 0.88, theta: 0 }),
   },
   {
     id: 'multi-human',
@@ -306,7 +331,7 @@ export function createSimulationStateForScenario(scenarioId: ScenarioId): Simula
   const initialBelief =
     typeof scenario.initialBelief === 'function'
       ? scenario.initialBelief(environment)
-      : (scenario.initialBelief ?? scenarioBelief(environment))
+      : (scenario.initialBelief ?? scenarioBelief(environment, undefined, scenario.initialRobot))
   const state: SimulationState = {
     time: 0,
     robot: clone(scenario.initialRobot),

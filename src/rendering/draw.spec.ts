@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { poseGaussianFromSigmas } from '../belief/poseBelief'
 import { drawScene } from './draw'
 
 function createRecordingContext() {
@@ -79,6 +80,7 @@ describe('drawScene', () => {
         obstacles: [],
       },
       belief: {
+        pose: poseGaussianFromSigmas({ x: 1, y: 1, theta: 0 }, 0.1, 0.1, 0.02),
         sigmaX: 0.1,
         sigmaY: 0.1,
         sigmaTheta: 0.02,
