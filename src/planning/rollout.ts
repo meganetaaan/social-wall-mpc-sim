@@ -25,6 +25,8 @@ const zeroCost = () => ({
     uncertainty: 0,
     mapUncertainty: 0,
     observationGain: 0,
+    stall: 0,
+    curiosity: 0,
     wallBeliefConsistency: 0,
   },
   total: 0,

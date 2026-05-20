@@ -66,6 +66,8 @@ export type CostTerms = {
   uncertainty: number
   mapUncertainty: number
   observationGain: number
+  stall: number
+  curiosity: number
   wallBeliefConsistency: number
 }
 export type CostBreakdown = { terms: CostTerms; total: number }

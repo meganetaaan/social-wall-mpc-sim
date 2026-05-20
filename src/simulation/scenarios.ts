@@ -389,6 +389,8 @@ function emptyCost(): CostBreakdown {
       uncertainty: 0,
       mapUncertainty: 0,
       observationGain: 0,
+      stall: 0,
+      curiosity: 0,
       wallBeliefConsistency: 0,
       goalProgress: 0,
       goalTerminal: 0,
