@@ -1,7 +1,6 @@
 import { mapUncertaintyTrace, traceSigma, updateBelief, wallConfidence } from '../belief/simpleBelief'
 import { estimatedWallKnowledge, observedCoverageRatio, observeWalls } from '../belief/wallMapBelief'
-import { goalDistance, goalRadius } from '../simulation/goal'
-import { clamp, distance, nearestWall, normAngle, wallTangentAngle } from '../simulation/math'
+import { distance, nearestWall, normAngle, wallTangentAngle } from '../simulation/math'
 import type {
   BeliefState,
   ControlInput,
@@ -26,8 +25,6 @@ const emptyTerms = () => ({
   uncertainty: 0,
   mapUncertainty: 0,
   observationGain: 0,
-  stall: 0,
-  curiosity: 0,
   wallBeliefConsistency: 0,
 })
 
@@ -98,8 +95,6 @@ export function evaluateStageCost(args: {
   terms.uncertainty = parameters.wUncertainty * traceSigma(belief)
   terms.mapUncertainty = parameters.wUncertainty * mapUncertaintyTrace(belief)
   terms.observationGain = -expectedObservationGain(robot, control, environment, belief, parameters)
-  terms.stall = stallCost(robot, control, environment, parameters)
-  terms.curiosity = curiosityCost(robot, control, environment, belief, parameters)
   terms.wallBeliefConsistency = wallBeliefConsistencyCost(robot, environment, belief, parameters)
   return { terms, total: Object.values(terms).reduce((sum, value) => sum + value, 0) }
 }
@@ -143,47 +138,6 @@ export function expectedObservationGain(
   }
   const forwardLook = Math.max(0.2, control.v + 0.2)
   return p.wUncertainty * 0.5 * gain * forwardLook
-}
-
-export function stallCost(
-  robot: RobotState,
-  control: ControlInput,
-  environment: Environment,
-  p: Pick<PlannerParameters, 'vMax' | 'wGoalProgress'>,
-) {
-  const remaining = Math.max(0, goalDistance(robot, environment) - goalRadius(environment))
-  if (remaining <= 0) return 0
-
-  const nearStop = clamp((0.18 - Math.abs(control.v)) / 0.18, 0, 1)
-  const distancePressure = clamp(remaining / 2, 0, 1)
-  const speedScale = Math.max(0.2, p.vMax)
-  return p.wGoalProgress * 0.12 * speedScale * distancePressure * nearStop ** 2
-}
-
-export function curiosityCost(
-  robot: RobotState,
-  control: ControlInput,
-  environment: Environment,
-  belief: BeliefState,
-  p: PlannerParameters,
-) {
-  const observations = observeWalls(robot, environment, p)
-  let curiosity = 0
-  for (const observation of observations) {
-    const estimated = belief.estimatedWalls.find((candidate) => candidate.wallId === observation.wallId)
-    const known = estimatedWallKnowledge(estimated)
-    const existingCoverage =
-      estimated && estimated.tMax > estimated.tMin
-        ? Math.max(0, Math.min(observation.tMax, estimated.tMax) - Math.max(observation.tMin, estimated.tMin))
-        : 0
-    const observedCoverage = Math.max(0, observation.tMax - observation.tMin)
-    const unknownCoverage = Math.max(0, observedCoverage - existingCoverage)
-    const novelty = clamp(unknownCoverage + (1 - known) * observedCoverage, 0, 1)
-    curiosity += observation.strength * novelty
-  }
-
-  const forwardLook = Math.max(0.25, control.v + 0.25)
-  return -p.wUncertainty * 0.35 * curiosity * forwardLook
 }
 
 export function wallBeliefConsistencyCost(

@@ -56,7 +56,6 @@ describe('modular MPC cost terms', () => {
     expect(Object.keys(breakdown.terms).sort()).toEqual([
       'collision',
       'control',
-      'curiosity',
       'goalProgress',
       'goalTerminal',
       'human',
@@ -64,7 +63,6 @@ describe('modular MPC cost terms', () => {
       'observationGain',
       'progress',
       'smoothness',
-      'stall',
       'uncertainty',
       'wall',
       'wallBeliefConsistency',
@@ -95,67 +93,5 @@ describe('modular MPC cost terms', () => {
     })
 
     expect(forward.terms.goalProgress).toBeLessThan(stopped.terms.goalProgress)
-  })
-
-  it('penalizes stopping while still far from the goal', () => {
-    const environment = { walls: [wall], obstacles: [], goal: { x: 8, y: 1 }, goalRadius: 0.25 }
-    const stopped = evaluateStageCost({
-      robot,
-      humans: [],
-      environment,
-      belief,
-      control: { v: 0, omega: 0 },
-      previousControl: { v: 0.1, omega: 0 },
-      parameters: defaultParameters,
-    })
-    const moving = evaluateStageCost({
-      robot,
-      humans: [],
-      environment,
-      belief,
-      control: { v: 0.35, omega: 0 },
-      previousControl: { v: 0.1, omega: 0 },
-      parameters: defaultParameters,
-    })
-
-    expect(stopped.terms.stall).toBeGreaterThan(0)
-    expect(stopped.terms.stall).toBeGreaterThan(moving.terms.stall)
-  })
-
-  it('rewards observing unknown wall coverage more than already-known wall coverage', () => {
-    const unknownBelief: BeliefState = {
-      ...belief,
-      wallBeliefs: [{ wallId: wall.id, confidence: 0.05, lastObservedAt: -1 }],
-      estimatedWalls: [{ wallId: wall.id, tMin: 0, tMax: 0, confidence: 0, lastObservedAt: -1 }],
-      mapConfidence: 0.05,
-    }
-    const knownBelief: BeliefState = {
-      ...belief,
-      wallBeliefs: [{ wallId: wall.id, confidence: 1, lastObservedAt: 0 }],
-      estimatedWalls: [{ wallId: wall.id, tMin: 0, tMax: 1, confidence: 1, lastObservedAt: 0 }],
-      mapConfidence: 1,
-    }
-    const environment = { walls: [wall], obstacles: [], goal: { x: 8, y: 1 } }
-
-    const unknown = evaluateStageCost({
-      robot,
-      humans: [],
-      environment,
-      belief: unknownBelief,
-      control: { v: 0.4, omega: 0 },
-      previousControl: { v: 0.2, omega: 0 },
-      parameters: defaultParameters,
-    })
-    const known = evaluateStageCost({
-      robot,
-      humans: [],
-      environment,
-      belief: knownBelief,
-      control: { v: 0.4, omega: 0 },
-      previousControl: { v: 0.2, omega: 0 },
-      parameters: defaultParameters,
-    })
-
-    expect(unknown.terms.curiosity).toBeLessThan(known.terms.curiosity)
   })
 })
