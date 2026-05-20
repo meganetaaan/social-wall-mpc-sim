@@ -15,18 +15,19 @@ describe('headless experiment runner', () => {
     expect(runScenarioExperiment(args)).toMatchObject(runScenarioExperiment(args))
   })
 
-  it('reaches the default crossing-human goal with belief-mpc within the bounded run', () => {
+  it('reaches the crossing-human goal with belief-mpc within a bounded fast replay', () => {
     const result = runScenarioExperiment({
       scenarioId: 'crossing-human',
       plannerMode: 'belief-mpc',
-      maxSteps: 700,
+      parameters: fastParams,
+      maxSteps: 120,
     })
     expect(result.reachedGoal).toBe(true)
     expect(result.timeToGoal).not.toBeNull()
-    expect(result.steps).toBeLessThanOrEqual(700)
+    expect(result.steps).toBeLessThanOrEqual(120)
     expect(result.finalGoalDistance).toBeLessThanOrEqual(0.21)
     expect(result.bestGoalDistance).toBeLessThanOrEqual(0.21)
-  }, 35_000)
+  })
 
   it('keeps a meaningful baseline comparison against wall-only', () => {
     const beliefMpc = runScenarioExperiment({

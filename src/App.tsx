@@ -25,17 +25,22 @@ export default function App() {
 
   useEffect(() => {
     if (!running) return
+    let active = true
     let frame = 0
     let last = 0
     const loop = (time: number) => {
+      if (!active) return
       if (time - last > 90) {
         step()
         last = time
       }
-      frame = requestAnimationFrame(loop)
+      if (active) frame = requestAnimationFrame(loop)
     }
     frame = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(frame)
+    return () => {
+      active = false
+      cancelAnimationFrame(frame)
+    }
   }, [running, step])
 
   const reset = () => {
