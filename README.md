@@ -57,7 +57,7 @@ At each control cycle:
 2. Roll out differential-drive dynamics:
    `x += v cos(theta) dt`, `y += v sin(theta) dt`, `theta += omega dt`.
 3. Predict humans with a deterministic constant-velocity/bouncing-boundary model.
-4. Generate deterministic range observations from the robot sensor cone against true wall segments.
+4. Generate deterministic noisy range/bearing observations from the robot sensor cone against true wall segments.
 5. Update a simplified belief: pose uncertainty grows with motion and shrinks near observed walls; observed wall intervals expand their estimated coverage and confidence while unobserved intervals remain uncertain.
 6. Evaluate the unified cost breakdown for each rollout.
 7. Apply only the first control from the best sequence.
@@ -187,7 +187,7 @@ The observation model is a deterministic approximation, not ray-cast SLAM:
 
 - the robot has a limited `sensorRadius` and `sensorFov`
 - sample points on each true wall are observable when they are inside range and bearing limits and have line of sight past nearer walls
-- an observation records the visible interval, strength/confidence, and a representative ray target
+- an observation records the visible interval, strength/confidence, a representative ray target, and deterministic noisy `range`/`bearing` measurements with parameter-derived standard deviations
 - repeated observations merge intervals and raise confidence
 - uncovered portions of a wall continue to contribute map uncertainty
 
@@ -243,6 +243,7 @@ Algorithm code is kept independent from rendering. Rendering receives immutable-
 
 - Belief update is a pedagogical scalar covariance plus per-wall interval coverage approximation, not EKF/Graph-SLAM.
 - Wall visibility uses sampled wall points with line-of-sight occlusion, not continuous geometric clipping of full visible wall intervals.
+- Wall observations expose deterministic noisy measurements, but the model still does not perform likelihood-based data association or continuous ray-cast SLAM.
 - Candidate generation is simple sampling around a few motion templates, not full MPPI with weighted updates.
 - Human prediction is constant-velocity and does not model intent.
 - Wall selection is nearest-wall based; there is no global route or topological planner.

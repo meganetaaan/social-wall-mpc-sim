@@ -35,6 +35,10 @@ export type WallObservation = {
   tMax: number
   confidence: number
   strength: number
+  range: number
+  bearing: number
+  rangeStdDev: number
+  bearingStdDev: number
   rayTarget: Vec2
 }
 export type StaticObstacle = { id: string; x: number; y: number; radius: number }

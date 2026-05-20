@@ -1,4 +1,4 @@
-import { clamp, distance, dot, nearestPointOnSegment, normAngle, sub } from '../simulation/math'
+import { clamp, distance, dot, mulberry32, nearestPointOnSegment, normAngle, sub } from '../simulation/math'
 import type {
   BeliefState,
   Environment,
@@ -16,6 +16,46 @@ const segmentPoint = (wall: WallSegment, t: number): Vec2 => ({
   y: wall.a.y + (wall.b.y - wall.a.y) * t,
 })
 const LOS_EPSILON = 1e-7
+
+function hashObservationSeed(input: string) {
+  let hash = 2166136261
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return hash >>> 0
+}
+
+function quantized(value: number) {
+  return Math.round(value * 1000)
+}
+
+export function observationNoiseScales(p: PlannerParameters) {
+  return {
+    rangeStdDev: Math.max(0.015, p.sensorRadius * 0.015),
+    bearingStdDev: Math.max(0.005, p.sensorFov * 0.01),
+  }
+}
+
+export function noisyRangeBearingMeasurement(robot: RobotState, point: Vec2, p: PlannerParameters, key: string) {
+  const { rangeStdDev, bearingStdDev } = observationNoiseScales(p)
+  const seed = hashObservationSeed(
+    [key, quantized(robot.x), quantized(robot.y), quantized(robot.theta), quantized(point.x), quantized(point.y)].join(
+      ':',
+    ),
+  )
+  const random = mulberry32(seed)
+  const rangeNoise = (random() * 2 - 1) * 2 * rangeStdDev
+  const bearingNoise = (random() * 2 - 1) * 2 * bearingStdDev
+  const trueRange = distance(robot, point)
+  const trueBearing = normAngle(Math.atan2(point.y - robot.y, point.x - robot.x) - robot.theta)
+  return {
+    range: Math.max(0, trueRange + rangeNoise),
+    bearing: normAngle(trueBearing + bearingNoise),
+    rangeStdDev,
+    bearingStdDev,
+  }
+}
 
 const cross = (a: Vec2, b: Vec2) => a.x * b.y - a.y * b.x
 
@@ -99,13 +139,20 @@ export function observeWalls(robot: RobotState, environment: Environment, p: Pla
       ? [...observedSamples.map((sample) => sample.t), tNearest]
       : observedSamples.map((s) => s.t)
     const strength = observedSamples.reduce((sum, sample) => sum + sample.strength, 0) / observedSamples.length
+    const rayTarget = nearestVisible ? nearest : observedSamples[Math.floor(observedSamples.length / 2)].point
+    const measurement = noisyRangeBearingMeasurement(robot, rayTarget, p, `${wall.id}:${allT.join(':')}`)
+    const rangeNoiseRatio = measurement.rangeStdDev / Math.max(p.sensorRadius, measurement.rangeStdDev)
+    const bearingNoiseRatio = measurement.bearingStdDev / Math.max(p.sensorFov, measurement.bearingStdDev)
+    const noiseQuality = clamp01(1 - 0.5 * (rangeNoiseRatio + bearingNoiseRatio))
+    const adjustedStrength = strength * noiseQuality
     observations.push({
       wallId: wall.id,
       tMin: Math.min(...allT),
       tMax: Math.max(...allT),
-      confidence: clamp01(0.35 + strength * 0.65),
-      strength,
-      rayTarget: nearestVisible ? nearest : observedSamples[Math.floor(observedSamples.length / 2)].point,
+      confidence: clamp01(0.35 + adjustedStrength * 0.65),
+      strength: adjustedStrength,
+      ...measurement,
+      rayTarget,
     })
   }
   return observations
