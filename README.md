@@ -188,7 +188,9 @@ The observation model is a deterministic approximation, not ray-cast SLAM:
 - the robot has a limited `sensorRadius` and `sensorFov`
 - sample points on each true wall are observable when they are inside range and bearing limits and have line of sight past nearer walls
 - an observation records the visible interval, strength/confidence, a representative ray target, and deterministic noisy `range`/`bearing` measurements with parameter-derived standard deviations
+- observations also carry the sensor pose and can be evaluated against a candidate pose and wall with an independent Gaussian `p(z | x, m)` range/bearing likelihood
 - repeated observations merge intervals and raise confidence
+- wall confidence growth is lightly gated by a bounded affinity derived from that likelihood
 - uncovered portions of a wall continue to contribute map uncertainty
 
 ## UI
@@ -243,7 +245,7 @@ Algorithm code is kept independent from rendering. Rendering receives immutable-
 
 - Belief update is a pedagogical scalar covariance plus per-wall interval coverage approximation, not EKF/Graph-SLAM.
 - Wall visibility uses sampled wall points with line-of-sight occlusion, not continuous geometric clipping of full visible wall intervals.
-- Wall observations expose deterministic noisy measurements, but the model still does not perform likelihood-based data association or continuous ray-cast SLAM.
+- Wall observations expose deterministic noisy measurements and a Gaussian wall likelihood, but data association is still by known `wallId`; there is no anonymous feature map, EKF, particle SLAM, or continuous ray-cast SLAM.
 - Candidate generation is simple sampling around a few motion templates, not full MPPI with weighted updates.
 - Human prediction is constant-velocity and does not model intent.
 - Wall selection is nearest-wall based; there is no global route or topological planner.

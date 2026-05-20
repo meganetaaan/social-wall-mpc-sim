@@ -40,6 +40,7 @@ export type WallObservation = {
   rangeStdDev: number
   bearingStdDev: number
   rayTarget: Vec2
+  sensorPose: RobotState
 }
 export type StaticObstacle = { id: string; x: number; y: number; radius: number }
 export type Environment = { walls: WallSegment[]; obstacles: StaticObstacle[]; goal: Vec2; goalRadius?: number }

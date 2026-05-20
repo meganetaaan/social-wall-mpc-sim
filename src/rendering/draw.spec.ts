@@ -100,6 +100,7 @@ describe('drawScene', () => {
           rangeStdDev: 0.03,
           bearingStdDev: 0.01,
           rayTarget: { x: 1, y: 0 },
+          sensorPose: { x: 1, y: 1, theta: 0 },
         },
       ],
       robot: { x: 1, y: 1, theta: 0 },

@@ -11,11 +11,21 @@ import type {
 } from '../simulation/types'
 
 const clamp01 = (value: number) => clamp(value, 0, 1)
+const MIN_OBSERVATION_SIGMA = 1e-6
 const segmentPoint = (wall: WallSegment, t: number): Vec2 => ({
   x: wall.a.x + (wall.b.x - wall.a.x) * t,
   y: wall.a.y + (wall.b.y - wall.a.y) * t,
 })
 const LOS_EPSILON = 1e-7
+
+export type ObservationLikelihood = {
+  rangeResidual: number
+  bearingResidual: number
+  rangeSigma: number
+  bearingSigma: number
+  likelihood: number
+  logLikelihood: number
+}
 
 function hashObservationSeed(input: string) {
   let hash = 2166136261
@@ -35,6 +45,52 @@ export function observationNoiseScales(p: PlannerParameters) {
     rangeStdDev: Math.max(0.015, p.sensorRadius * 0.015),
     bearingStdDev: Math.max(0.005, p.sensorFov * 0.01),
   }
+}
+
+export function expectedRangeBearingToWall(
+  robot: RobotState,
+  wall: WallSegment,
+): { range: number; bearing: number; point: Vec2 } {
+  const point = nearestPointOnSegment(robot, wall)
+  return {
+    range: distance(robot, point),
+    bearing: normAngle(Math.atan2(point.y - robot.y, point.x - robot.x) - robot.theta),
+    point,
+  }
+}
+
+export function wallObservationLikelihood(
+  observation: Pick<WallObservation, 'range' | 'bearing' | 'rangeStdDev' | 'bearingStdDev'>,
+  robot: RobotState,
+  wall: WallSegment,
+): ObservationLikelihood {
+  const expected = expectedRangeBearingToWall(robot, wall)
+  const rangeSigma = Math.max(observation.rangeStdDev, MIN_OBSERVATION_SIGMA)
+  const bearingSigma = Math.max(observation.bearingStdDev, MIN_OBSERVATION_SIGMA)
+  const rangeResidual = observation.range - expected.range
+  const bearingResidual = normAngle(observation.bearing - expected.bearing)
+  const mahalanobisSquared = (rangeResidual / rangeSigma) ** 2 + (bearingResidual / bearingSigma) ** 2
+  const logLikelihood = -0.5 * mahalanobisSquared - Math.log(2 * Math.PI * rangeSigma * bearingSigma)
+  return {
+    rangeResidual,
+    bearingResidual,
+    rangeSigma,
+    bearingSigma,
+    likelihood: Math.exp(logLikelihood),
+    logLikelihood,
+  }
+}
+
+export function wallObservationAffinity(
+  observation: Pick<WallObservation, 'range' | 'bearing' | 'rangeStdDev' | 'bearingStdDev'>,
+  robot: RobotState,
+  wall: WallSegment,
+) {
+  const likelihood = wallObservationLikelihood(observation, robot, wall)
+  const mahalanobisSquared =
+    (likelihood.rangeResidual / likelihood.rangeSigma) ** 2 +
+    (likelihood.bearingResidual / likelihood.bearingSigma) ** 2
+  return clamp01(Math.exp(-0.5 * mahalanobisSquared))
 }
 
 export function noisyRangeBearingMeasurement(robot: RobotState, point: Vec2, p: PlannerParameters, key: string) {
@@ -153,6 +209,7 @@ export function observeWalls(robot: RobotState, environment: Environment, p: Pla
       strength: adjustedStrength,
       ...measurement,
       rayTarget,
+      sensorPose: { ...robot },
     })
   }
   return observations
@@ -173,16 +230,17 @@ export function updateEstimatedWallBelief(
     const observation = observations.find((candidate) => candidate.wallId === estimated.wallId)
     if (!observation) return { ...estimated, confidence: estimated.confidence * 0.998 }
     const hadCoverage = estimated.tMax > estimated.tMin
+    const wall = environment.walls.find((candidate) => candidate.id === estimated.wallId)
+    const affinity = wall ? wallObservationAffinity(observation, observation.sensorPose, wall) : 1
+    const affinityGate = 0.35 + 0.65 * affinity
+    const effectiveConfidence = observation.confidence * affinityGate
+    const effectiveStrength = observation.strength * affinityGate
     return {
       wallId: estimated.wallId,
       tMin: hadCoverage ? Math.min(estimated.tMin, observation.tMin) : observation.tMin,
       tMax: hadCoverage ? Math.max(estimated.tMax, observation.tMax) : observation.tMax,
       confidence: clamp01(
-        Math.max(
-          estimated.confidence * 0.996,
-          observation.confidence,
-          estimated.confidence + observation.strength * 0.14,
-        ),
+        Math.max(estimated.confidence * 0.996, effectiveConfidence, estimated.confidence + effectiveStrength * 0.14),
       ),
       lastObservedAt: time,
     }

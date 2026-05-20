@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { defaultParameters } from '../simulation/environment'
 import { distance, normAngle } from '../simulation/math'
 import type { Environment, EstimatedWallSegment, RobotState } from '../simulation/types'
-import { computeMapUncertainty, observedCoverageRatio, observeWalls, updateEstimatedWallBelief } from './wallMapBelief'
+import {
+  computeMapUncertainty,
+  expectedRangeBearingToWall,
+  observedCoverageRatio,
+  observeWalls,
+  updateEstimatedWallBelief,
+  wallObservationAffinity,
+  wallObservationLikelihood,
+} from './wallMapBelief'
 
 const environment: Environment = {
   goal: { x: 4, y: 2 },
@@ -13,6 +21,49 @@ const environment: Environment = {
 const params = { ...defaultParameters, sensorRadius: 2.5, sensorFov: Math.PI / 2 }
 
 describe('wall map observation model', () => {
+  it('computes expected range and relative bearing to the nearest point on a wall', () => {
+    const robot: RobotState = { x: 0, y: 0.25, theta: Math.PI / 2 }
+    const wall = environment.walls[0]
+
+    const expected = expectedRangeBearingToWall(robot, wall)
+
+    expect(expected.point).toEqual({ x: 1, y: 0.25 })
+    expect(expected.range).toBeCloseTo(1)
+    expect(expected.bearing).toBeCloseTo(normAngle(-Math.PI / 2))
+  })
+
+  it('scores a matching wall observation higher than a distant wrong wall', () => {
+    const robot: RobotState = { x: 0, y: 0, theta: 0 }
+    const wall = environment.walls[0]
+    const expected = expectedRangeBearingToWall(robot, wall)
+    const wrongWall = { id: 'wrong-wall', a: { x: 2, y: -1 }, b: { x: 2, y: 1 } }
+
+    const matching = wallObservationLikelihood({ ...expected, rangeStdDev: 0.05, bearingStdDev: 0.02 }, robot, wall)
+    const wrong = wallObservationLikelihood({ ...expected, rangeStdDev: 0.05, bearingStdDev: 0.02 }, robot, wrongWall)
+
+    expect(matching.logLikelihood).toBeGreaterThan(wrong.logLikelihood)
+    expect(matching.likelihood).toBeGreaterThan(wrong.likelihood)
+    expect(Number.isFinite(matching.likelihood)).toBe(true)
+  })
+
+  it('converts observation likelihood residuals to a bounded wall affinity', () => {
+    const robot: RobotState = { x: 0, y: 0, theta: 0 }
+    const wall = environment.walls[0]
+    const expected = expectedRangeBearingToWall(robot, wall)
+
+    const matching = wallObservationAffinity({ ...expected, rangeStdDev: 0.05, bearingStdDev: 0.02 }, robot, wall)
+    const inconsistent = wallObservationAffinity(
+      { range: expected.range + 1, bearing: expected.bearing + 0.5, rangeStdDev: 0.05, bearingStdDev: 0.02 },
+      robot,
+      wall,
+    )
+
+    expect(matching).toBeGreaterThan(0.99)
+    expect(matching).toBeLessThanOrEqual(1)
+    expect(inconsistent).toBeGreaterThanOrEqual(0)
+    expect(inconsistent).toBeLessThan(0.01)
+  })
+
   it('observes a nearby wall segment inside the robot field of view', () => {
     const robot: RobotState = { x: 0, y: 0, theta: 0 }
 
@@ -22,6 +73,14 @@ describe('wall map observation model', () => {
     expect(observations[0].wallId).toBe('front-wall')
     expect(observations[0].tMin).toBeLessThan(observations[0].tMax)
     expect(observations[0].confidence).toBeGreaterThan(0.35)
+  })
+
+  it('captures the sensor pose used to produce each wall observation', () => {
+    const robot: RobotState = { x: 0, y: 0.1, theta: 0.05 }
+
+    const [observation] = observeWalls(robot, environment, params)
+
+    expect(observation.sensorPose).toEqual(robot)
   })
 
   it('includes deterministic noisy range and bearing measurements for the representative wall point', () => {
@@ -144,5 +203,35 @@ describe('wall map observation model', () => {
     expect(observedCoverageRatio(second[0])).toBeGreaterThan(observedCoverageRatio(initial[0]))
     expect(second[0].confidence).toBeGreaterThan(initial[0].confidence)
     expect(computeMapUncertainty(second)).toBeLessThan(computeMapUncertainty(initial))
+  })
+
+  it('uses observation affinity to reduce confidence growth for inconsistent measurements while merging coverage', () => {
+    const initial: EstimatedWallSegment[] = [
+      { wallId: 'front-wall', tMin: 0.45, tMax: 0.55, confidence: 0.2, lastObservedAt: 0 },
+    ]
+    const robot: RobotState = { x: 0, y: 0, theta: 0 }
+    const [observed] = observeWalls(robot, environment, params)
+    const expected = expectedRangeBearingToWall(robot, environment.walls[0])
+    const consistentObservation = {
+      ...observed,
+      range: expected.range,
+      bearing: expected.bearing,
+      confidence: 0.95,
+      strength: 1,
+    }
+    const inconsistentObservation = {
+      ...consistentObservation,
+      range: consistentObservation.range + 1.5,
+      bearing: consistentObservation.bearing + 0.75,
+      confidence: 0.95,
+      strength: 1,
+    }
+
+    const consistent = updateEstimatedWallBelief(initial, environment, [consistentObservation], 1)
+    const inconsistent = updateEstimatedWallBelief(initial, environment, [inconsistentObservation], 1)
+
+    expect(observedCoverageRatio(inconsistent[0])).toBeGreaterThan(observedCoverageRatio(initial[0]))
+    expect(inconsistent[0].confidence).toBeLessThan(consistent[0].confidence)
+    expect(inconsistent[0].confidence - initial[0].confidence).toBeLessThan(0.3)
   })
 })
