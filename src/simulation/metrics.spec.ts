@@ -4,6 +4,118 @@ import { createInitialMetrics, estimatedMapCoverage, updateSimulationMetrics } f
 import { createSimulationStateForScenario } from './scenarios'
 
 describe('simulation metrics', () => {
+  it('reports zero pose inference error when belief mean equals the robot pose', () => {
+    const state = createSimulationStateForScenario('crossing-human')
+    const aligned = {
+      ...state,
+      belief: {
+        ...state.belief,
+        pose: { ...state.belief.pose, mean: state.robot },
+      },
+    }
+
+    const metrics = createInitialMetrics(aligned, defaultParameters)
+
+    expect(metrics.posePositionError).toBeCloseTo(0)
+    expect(metrics.poseHeadingError).toBeCloseTo(0)
+    expect(metrics.poseNormalizedError).toBeCloseTo(0)
+  })
+
+  it('reports positive pose inference error when belief mean differs from the robot pose', () => {
+    const state = createSimulationStateForScenario('crossing-human')
+    const offset = {
+      ...state,
+      belief: {
+        ...state.belief,
+        pose: {
+          ...state.belief.pose,
+          mean: { x: state.robot.x + 0.3, y: state.robot.y - 0.4, theta: state.robot.theta + 0.25 },
+        },
+      },
+    }
+
+    const metrics = createInitialMetrics(offset, defaultParameters)
+
+    expect(metrics.posePositionError).toBeGreaterThan(0)
+    expect(metrics.poseHeadingError).toBeGreaterThan(0)
+    expect(metrics.poseNormalizedError).toBeGreaterThan(0)
+  })
+
+  it('increases normalized pose error for the same pose error under smaller covariance', () => {
+    const state = createSimulationStateForScenario('crossing-human')
+    const mean = { x: state.robot.x + 0.2, y: state.robot.y, theta: state.robot.theta + 0.1 }
+    const loose = createInitialMetrics(
+      {
+        ...state,
+        belief: {
+          ...state.belief,
+          pose: {
+            mean,
+            covariance: [
+              [0.25, 0, 0],
+              [0, 0.25, 0],
+              [0, 0, 0.04],
+            ],
+          },
+        },
+      },
+      defaultParameters,
+    )
+    const tight = createInitialMetrics(
+      {
+        ...state,
+        belief: {
+          ...state.belief,
+          pose: {
+            mean,
+            covariance: [
+              [0.01, 0, 0],
+              [0, 0.01, 0],
+              [0, 0, 0.0025],
+            ],
+          },
+        },
+      },
+      defaultParameters,
+    )
+
+    expect(tight.poseNormalizedError).toBeGreaterThan(loose.poseNormalizedError)
+  })
+
+  it('decreases map knowledge error as estimated wall coverage and confidence improve', () => {
+    const state = createSimulationStateForScenario('crossing-human')
+    const poorMetrics = createInitialMetrics(
+      {
+        ...state,
+        belief: {
+          ...state.belief,
+          estimatedWalls: [],
+        },
+      },
+      defaultParameters,
+    )
+    const goodMetrics = createInitialMetrics(
+      {
+        ...state,
+        belief: {
+          ...state.belief,
+          estimatedWalls: state.environment.walls.map((wall) => ({
+            wallId: wall.id,
+            tMin: 0,
+            tMax: 1,
+            confidence: 1,
+            lastObservedAt: 0,
+          })),
+        },
+      },
+      defaultParameters,
+    )
+
+    expect(goodMetrics.mapKnowledgeError).toBeGreaterThanOrEqual(0)
+    expect(goodMetrics.mapKnowledgeError).toBeLessThan(poorMetrics.mapKnowledgeError)
+    expect(poorMetrics.mapKnowledgeError).toBeLessThanOrEqual(1)
+  })
+
   it('tracks goal distance, sticky arrival, first time to goal, and best distance', () => {
     const state = createSimulationStateForScenario('crossing-human')
     const goalState = {

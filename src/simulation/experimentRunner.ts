@@ -31,6 +31,10 @@ export type ScenarioExperimentSummary = {
   maxWallDistanceError: number
   uncertaintyTrace: number
   estimatedMapCoverage: number
+  posePositionError: number
+  poseHeadingError: number
+  poseNormalizedError: number
+  mapKnowledgeError: number
 }
 
 export type ScenarioBatchExperimentResult = {
@@ -96,6 +100,10 @@ export function summarizeScenarioExperiment(
     maxWallDistanceError: finiteNumber(metrics.maxWallDistanceError),
     uncertaintyTrace: finiteNumber(metrics.uncertaintyTrace),
     estimatedMapCoverage: finiteNumber(metrics.estimatedMapCoverage),
+    posePositionError: finiteNumber(metrics.posePositionError),
+    poseHeadingError: finiteNumber(metrics.poseHeadingError),
+    poseNormalizedError: finiteNumber(metrics.poseNormalizedError),
+    mapKnowledgeError: finiteNumber(metrics.mapKnowledgeError),
   }
 }
 

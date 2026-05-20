@@ -99,9 +99,15 @@ describe('headless experiment runner', () => {
       summary.maxWallDistanceError,
       summary.uncertaintyTrace,
       summary.estimatedMapCoverage,
+      summary.posePositionError,
+      summary.poseHeadingError,
+      summary.poseNormalizedError,
+      summary.mapKnowledgeError,
     ]
 
     expect(numericValues.every((value) => Number.isFinite(value))).toBe(true)
+    expect(summary.mapKnowledgeError).toBeGreaterThanOrEqual(0)
+    expect(summary.mapKnowledgeError).toBeLessThanOrEqual(1)
     if (summary.timeToGoal !== null) {
       expect(Number.isFinite(summary.timeToGoal)).toBe(true)
     }

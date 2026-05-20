@@ -81,8 +81,24 @@ export function CostPanel({ cost, state }: Props) {
           <dd>{state.metrics.uncertaintyTrace.toFixed(2)}</dd>
         </div>
         <div>
+          <dt>pose pos err</dt>
+          <dd>{state.metrics.posePositionError.toFixed(2)}m</dd>
+        </div>
+        <div>
+          <dt>pose head err</dt>
+          <dd>{state.metrics.poseHeadingError.toFixed(2)}rad</dd>
+        </div>
+        <div>
+          <dt>pose norm err</dt>
+          <dd>{state.metrics.poseNormalizedError.toFixed(2)}</dd>
+        </div>
+        <div>
           <dt>map coverage</dt>
           <dd>{state.metrics.estimatedMapCoverage.toFixed(2)}</dd>
+        </div>
+        <div>
+          <dt>map knowledge err</dt>
+          <dd>{state.metrics.mapKnowledgeError.toFixed(2)}</dd>
         </div>
         <div>
           <dt>selected cost</dt>

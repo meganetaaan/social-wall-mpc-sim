@@ -121,6 +121,10 @@ export type SimulationMetrics = {
   progressAlongWall: number
   uncertaintyTrace: number
   estimatedMapCoverage: number
+  posePositionError: number
+  poseHeadingError: number
+  poseNormalizedError: number
+  mapKnowledgeError: number
   selectedCost: number
   goalDistance: number
   goalReached: boolean

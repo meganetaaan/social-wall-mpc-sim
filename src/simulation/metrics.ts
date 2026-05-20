@@ -1,6 +1,6 @@
 import { tracePoseCovariance } from '../belief/poseBelief'
 import { goalDistance, goalRadius, isGoalReached } from './goal'
-import { distance, length, nearestWall, sub, wallTangentAngle } from './math'
+import { clamp, distance, length, nearestWall, normAngle, sub, wallTangentAngle } from './math'
 import type {
   BeliefState,
   ControlInput,
@@ -12,6 +12,7 @@ import type {
 } from './types'
 
 const stopVelocityThreshold = 0.05
+const minPoseVariance = 1e-4
 
 export function estimatedMapCoverage(environment: Environment, belief: BeliefState) {
   const totalLength = environment.walls.reduce((sum, wall) => sum + length(sub(wall.b, wall.a)), 0)
@@ -23,6 +24,19 @@ export function estimatedMapCoverage(environment: Environment, belief: BeliefSta
     return sum + length(sub(wall.b, wall.a)) * coverage
   }, 0)
   return coveredLength / totalLength
+}
+
+export function mapKnowledgeError(environment: Environment, belief: BeliefState) {
+  const totalLength = environment.walls.reduce((sum, wall) => sum + length(sub(wall.b, wall.a)), 0)
+  if (totalLength <= 0) return 0
+  const knownLength = environment.walls.reduce((sum, wall) => {
+    const estimated = belief.estimatedWalls.find((candidate) => candidate.wallId === wall.id)
+    if (!estimated) return sum
+    const coverage = clamp(estimated.tMax - estimated.tMin, 0, 1)
+    const confidence = clamp(estimated.confidence, 0, 1)
+    return sum + length(sub(wall.b, wall.a)) * coverage * confidence
+  }, 0)
+  return clamp(1 - knownLength / totalLength, 0, 1)
 }
 
 export function createInitialMetrics(
@@ -38,6 +52,7 @@ export function createInitialMetrics(
   const wallError = wallDistanceError(state.robot, state.environment, parameters)
   const currentGoalDistance = goalDistance(state.robot, state.environment)
   const reached = isGoalReached(state.robot, state.environment)
+  const poseErrors = poseInferenceErrors(state.robot, state.belief)
   return {
     elapsedTime: 0,
     meanWallDistanceError: Math.abs(wallError),
@@ -49,6 +64,8 @@ export function createInitialMetrics(
     progressAlongWall: 0,
     uncertaintyTrace: uncertaintyTrace(state.belief),
     estimatedMapCoverage: estimatedMapCoverage(state.environment, state.belief),
+    ...poseErrors,
+    mapKnowledgeError: mapKnowledgeError(state.environment, state.belief),
     selectedCost: state.costBreakdown?.total ?? 0,
     goalDistance: currentGoalDistance,
     goalReached: reached,
@@ -85,6 +102,7 @@ export function updateSimulationMetrics(args: {
   const currentGoalDistance = goalDistance(robot, environment)
   const reachedThisStep = currentGoalDistance <= goalRadius(environment)
   const goalReached = previous.goalReached || reachedThisStep
+  const poseErrors = poseInferenceErrors(robot, belief)
 
   return {
     elapsedTime,
@@ -99,6 +117,8 @@ export function updateSimulationMetrics(args: {
     progressAlongWall: previous.progressAlongWall + progress,
     uncertaintyTrace: uncertaintyTrace(belief),
     estimatedMapCoverage: estimatedMapCoverage(environment, belief),
+    ...poseErrors,
+    mapKnowledgeError: mapKnowledgeError(environment, belief),
     selectedCost,
     goalDistance: currentGoalDistance,
     goalReached,
@@ -122,4 +142,21 @@ function minHumanDistance(robot: RobotState, humans: HumanState[]) {
 
 function uncertaintyTrace(belief: BeliefState) {
   return belief.pose ? tracePoseCovariance(belief.pose) : belief.sigmaX + belief.sigmaY + belief.sigmaTheta
+}
+
+function poseInferenceErrors(robot: RobotState, belief: BeliefState) {
+  const mean = belief.pose?.mean ?? robot
+  const dx = robot.x - mean.x
+  const dy = robot.y - mean.y
+  const dtheta = normAngle(robot.theta - mean.theta)
+  const covariance = belief.pose?.covariance
+  const varX = Math.max(minPoseVariance, covariance?.[0]?.[0] ?? belief.sigmaX)
+  const varY = Math.max(minPoseVariance, covariance?.[1]?.[1] ?? belief.sigmaY)
+  const varTheta = Math.max(minPoseVariance, covariance?.[2]?.[2] ?? belief.sigmaTheta)
+
+  return {
+    posePositionError: Math.hypot(dx, dy),
+    poseHeadingError: Math.abs(dtheta),
+    poseNormalizedError: Math.sqrt((dx * dx) / varX + (dy * dy) / varY + (dtheta * dtheta) / varTheta),
+  }
 }

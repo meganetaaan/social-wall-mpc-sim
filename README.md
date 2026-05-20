@@ -136,7 +136,8 @@ Headless verification uses:
 runScenarioExperiment({
   scenarioId: 'crossing-human',
   plannerMode: 'belief-mpc',
-  maxSteps: 700,
+  parameters: { sampleCount: 12, horizonSteps: 6 },
+  maxSteps: 120,
 })
 ```
 
@@ -159,7 +160,13 @@ The metrics panel reports compact experiment readouts:
 - **Best goal distance**: closest distance observed so far.
 - **Trace sigma**: current `sigmaX + sigmaY + sigmaTheta`.
 - **Map coverage**: fraction of true wall length covered by estimated wall intervals.
+- **Pose position error**: Euclidean distance between the true robot pose and `belief.pose.mean`.
+- **Pose heading error**: absolute wrapped heading error between the true heading and `belief.pose.mean.theta`.
+- **Pose normalized error**: diagonal-covariance normalized pose error, using safe lower bounds for `x`, `y`, and heading variance.
+- **Map knowledge error**: true-map-backed score in `[0, 1]`; lower means estimated wall length is covered with higher confidence, while higher means coverage or confidence is poor.
 - **Selected cost**: total cost of the selected rollout for the current step.
+
+The pose and map-knowledge errors are inference-quality metrics for this approximation. They intentionally use simulator ground truth for evaluation only; the planner still consumes the lightweight belief state rather than a full SLAM posterior.
 
 ## Cost terms
 
@@ -251,5 +258,7 @@ Algorithm code is kept independent from rendering. Rendering receives immutable-
 - Wall selection is nearest-wall based; there is no global route or topological planner.
 - Safety constraints are soft penalties, so extreme parameter choices can still produce unsafe rollouts.
 - Baselines are deliberately simple and should not be interpreted as tuned controllers.
-- Metrics are frame-step counts and simple geometric summaries, not a statistical benchmark suite.
+- Metrics include simple inference-quality errors for pose and true-map-backed wall knowledge, but they are still lightweight geometric summaries rather than a statistical benchmark suite.
 - Goal reaching is still local and receding-horizon. There is no global planner, so reaching remains scenario-dependent and can fail if the goal is permanently blocked or placed behind a route that the local candidate set cannot discover.
+
+Current roadmap position: this version adds pose and map inference-quality readouts for the belief-SLAM approximation. It still does not implement full probability-distribution belief state, anonymous wall data association, human-state belief, FastSLAM, POMCP, or a true POMDP planner.
