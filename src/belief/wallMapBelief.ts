@@ -15,6 +15,31 @@ const segmentPoint = (wall: WallSegment, t: number): Vec2 => ({
   x: wall.a.x + (wall.b.x - wall.a.x) * t,
   y: wall.a.y + (wall.b.y - wall.a.y) * t,
 })
+const LOS_EPSILON = 1e-7
+
+const cross = (a: Vec2, b: Vec2) => a.x * b.y - a.y * b.x
+
+function lineOfSightParameter(origin: Vec2, target: Vec2, wall: WallSegment) {
+  const ray = sub(target, origin)
+  const wallVector = sub(wall.b, wall.a)
+  const denominator = cross(ray, wallVector)
+  if (Math.abs(denominator) < LOS_EPSILON) return undefined
+
+  const offset = sub(wall.a, origin)
+  const rayT = cross(offset, wallVector) / denominator
+  const wallT = cross(offset, ray) / denominator
+  if (wallT <= LOS_EPSILON || wallT >= 1 - LOS_EPSILON) return undefined
+  return rayT
+}
+
+function isLineOfSightBlocked(origin: Vec2, target: Vec2, wall: WallSegment) {
+  const rayT = lineOfSightParameter(origin, target, wall)
+  return rayT !== undefined && rayT > LOS_EPSILON && rayT < 1 - LOS_EPSILON
+}
+
+function hasLineOfSight(origin: Vec2, target: Vec2, targetWall: WallSegment, walls: WallSegment[]) {
+  return !walls.some((blocker) => blocker.id !== targetWall.id && isLineOfSightBlocked(origin, target, blocker))
+}
 
 function parameterForPoint(wall: WallSegment, point: Vec2) {
   const ab = sub(wall.b, wall.a)
@@ -59,6 +84,7 @@ export function observeWalls(robot: RobotState, environment: Environment, p: Pla
       if (r > p.sensorRadius) continue
       const bearing = Math.atan2(point.y - robot.y, point.x - robot.x)
       if (Math.abs(normAngle(bearing - robot.theta)) > p.sensorFov / 2) continue
+      if (!hasLineOfSight(robot, point, wall, environment.walls)) continue
       observedSamples.push({ t, point, strength: observationStrength(robot, point, p) })
     }
     if (observedSamples.length === 0) continue
@@ -67,7 +93,8 @@ export function observeWalls(robot: RobotState, environment: Environment, p: Pla
     const tNearest = parameterForPoint(wall, nearest)
     const nearestVisible =
       distance(robot, nearest) <= p.sensorRadius &&
-      Math.abs(normAngle(Math.atan2(nearest.y - robot.y, nearest.x - robot.x) - robot.theta)) <= p.sensorFov / 2
+      Math.abs(normAngle(Math.atan2(nearest.y - robot.y, nearest.x - robot.x) - robot.theta)) <= p.sensorFov / 2 &&
+      hasLineOfSight(robot, nearest, wall, environment.walls)
     const allT = nearestVisible
       ? [...observedSamples.map((sample) => sample.t), tNearest]
       : observedSamples.map((s) => s.t)

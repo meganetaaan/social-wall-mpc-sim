@@ -126,7 +126,7 @@ These numbers are deterministic for the fixed scenarios, seeds, parameters, and 
 
 ## Goal reaching
 
-The green marker is testable state, not just a visual target. `Environment.goalRadius` defines the arrival threshold; if a scenario omits it, the simulator uses a stricter default radius of `0.20m`. The default scenario sets the same threshold explicitly, so arrival requires the robot center to approach the green marker closely rather than merely entering a broad visual ring.
+The green marker is testable state, not just a visual target. `Environment.goalRadius` defines the arrival threshold; if a scenario omits it, the simulator uses a stricter default radius of `0.20m`. The default scenario sets a `0.21m` threshold so arrival still requires the robot center to approach the green marker closely rather than merely entering a broad visual ring.
 
 Goal arrival means the robot center is within that radius of `Environment.goal`. Once reached, `goalReached` stays true and `timeToGoal` records the first simulated arrival time. The simulator also tracks current `goalDistance` and `bestGoalDistance`.
 
@@ -186,7 +186,7 @@ The true map is `Environment.walls`. It is deliberately separate from `BeliefSta
 The observation model is a deterministic approximation, not ray-cast SLAM:
 
 - the robot has a limited `sensorRadius` and `sensorFov`
-- sample points on each true wall are observable when they are inside range and bearing limits
+- sample points on each true wall are observable when they are inside range and bearing limits and have line of sight past nearer walls
 - an observation records the visible interval, strength/confidence, and a representative ray target
 - repeated observations merge intervals and raise confidence
 - uncovered portions of a wall continue to contribute map uncertainty
@@ -242,7 +242,7 @@ Algorithm code is kept independent from rendering. Rendering receives immutable-
 ## Known limitations
 
 - Belief update is a pedagogical scalar covariance plus per-wall interval coverage approximation, not EKF/Graph-SLAM.
-- Wall visibility ignores occlusion and uses sampled wall points rather than geometric clipping/ray casting.
+- Wall visibility uses sampled wall points with line-of-sight occlusion, not continuous geometric clipping of full visible wall intervals.
 - Candidate generation is simple sampling around a few motion templates, not full MPPI with weighted updates.
 - Human prediction is constant-velocity and does not model intent.
 - Wall selection is nearest-wall based; there is no global route or topological planner.

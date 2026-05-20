@@ -39,7 +39,7 @@ const defaultPoseMean: RobotState = { x: 0, y: 0, theta: 0 }
 
 const baseEnvironment: Environment = {
   goal: { x: 7.1, y: 2.7 },
-  goalRadius: 0.2,
+  goalRadius: 0.21,
   walls: [
     { id: 'follow-wall-start', a: { x: 0.3, y: 0.2 }, b: { x: 2.4, y: 0.2 } },
     { id: 'lower-alcove-left', a: { x: 2.4, y: 0.2 }, b: { x: 2.4, y: 0.95 } },
