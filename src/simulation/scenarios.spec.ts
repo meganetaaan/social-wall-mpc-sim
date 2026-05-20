@@ -30,7 +30,8 @@ describe('scenario definitions', () => {
     for (const scenario of scenarioDefinitions) {
       const state = createSimulationStateForScenario(scenario.id)
       expect(state.environment.walls.length).toBeGreaterThan(0)
-      expect(state.humans.length).toBeGreaterThan(0)
+      if (scenario.id !== 'spiral-known' && scenario.id !== 'spiral-unknown')
+        expect(state.humans.length).toBeGreaterThan(0)
       expect(state.belief.estimatedWalls.map((wall) => wall.wallId)).toEqual(
         state.environment.walls.map((wall) => wall.id),
       )
@@ -57,7 +58,7 @@ describe('scenario definitions', () => {
     ).toBe(true)
   })
 
-  it('adds known and unknown spiral corridors with central goals', () => {
+  it('adds known and unknown spiral corridors with central goals and no humans', () => {
     const known = createSimulationStateForScenario('spiral-known')
     const unknown = createSimulationStateForScenario('spiral-unknown')
 
@@ -65,6 +66,8 @@ describe('scenario definitions', () => {
     expect(unknown.environment.walls.length).toBe(known.environment.walls.length)
     expect(known.environment.goal.x).toBeCloseTo(5, 1)
     expect(known.environment.goal.y).toBeCloseTo(2.5, 1)
+    expect(known.humans).toEqual([])
+    expect(unknown.humans).toEqual([])
     expect(known.belief.estimatedWalls.filter((wall) => wall.confidence > 0.6).length).toBeGreaterThan(
       known.environment.walls.length / 2,
     )
