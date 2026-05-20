@@ -35,6 +35,7 @@ export type ScenarioExperimentSummary = {
   poseHeadingError: number
   poseNormalizedError: number
   mapKnowledgeError: number
+  wallAssociationAccuracy: number
 }
 
 export type ScenarioBatchExperimentResult = {
@@ -104,6 +105,7 @@ export function summarizeScenarioExperiment(
     poseHeadingError: finiteNumber(metrics.poseHeadingError),
     poseNormalizedError: finiteNumber(metrics.poseNormalizedError),
     mapKnowledgeError: finiteNumber(metrics.mapKnowledgeError),
+    wallAssociationAccuracy: finiteNumber(metrics.wallAssociationAccuracy),
   }
 }
 

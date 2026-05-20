@@ -1,4 +1,5 @@
 import { tracePoseCovariance } from '../belief/poseBelief'
+import { wallAssociationAccuracy } from '../belief/wallMapBelief'
 import { goalDistance, goalRadius, isGoalReached } from './goal'
 import { clamp, distance, length, nearestWall, normAngle, sub, wallTangentAngle } from './math'
 import type {
@@ -9,6 +10,7 @@ import type {
   PlannerParameters,
   RobotState,
   SimulationMetrics,
+  WallObservation,
 } from './types'
 
 const stopVelocityThreshold = 0.05
@@ -45,6 +47,7 @@ export function createInitialMetrics(
     humans: HumanState[]
     environment: Environment
     belief: BeliefState
+    currentObservations?: WallObservation[]
     costBreakdown?: { total: number }
   },
   parameters: Pick<PlannerParameters, 'dWallTarget'>,
@@ -66,6 +69,7 @@ export function createInitialMetrics(
     estimatedMapCoverage: estimatedMapCoverage(state.environment, state.belief),
     ...poseErrors,
     mapKnowledgeError: mapKnowledgeError(state.environment, state.belief),
+    wallAssociationAccuracy: wallAssociationAccuracy(state.currentObservations ?? [], state.environment.walls),
     selectedCost: state.costBreakdown?.total ?? 0,
     goalDistance: currentGoalDistance,
     goalReached: reached,
@@ -83,9 +87,21 @@ export function updateSimulationMetrics(args: {
   belief: BeliefState
   control: ControlInput
   selectedCost: number
+  currentObservations?: WallObservation[]
   parameters: PlannerParameters
 }): SimulationMetrics {
-  const { previous, previousRobot, robot, humans, environment, belief, control, selectedCost, parameters } = args
+  const {
+    previous,
+    previousRobot,
+    robot,
+    humans,
+    environment,
+    belief,
+    control,
+    selectedCost,
+    currentObservations,
+    parameters,
+  } = args
   const elapsedTime = previous.elapsedTime + parameters.dt
   const stepCount = Math.max(1, Math.round(elapsedTime / parameters.dt))
   const currentWallError = Math.abs(wallDistanceError(robot, environment, parameters))
@@ -119,6 +135,7 @@ export function updateSimulationMetrics(args: {
     estimatedMapCoverage: estimatedMapCoverage(environment, belief),
     ...poseErrors,
     mapKnowledgeError: mapKnowledgeError(environment, belief),
+    wallAssociationAccuracy: wallAssociationAccuracy(currentObservations ?? [], environment.walls),
     selectedCost,
     goalDistance: currentGoalDistance,
     goalReached,

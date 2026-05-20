@@ -16,6 +16,7 @@ const uiScenarioIds: ScenarioId[] = [
   'follow-behind-human',
   'overtaking-human',
   'yielding-blocker',
+  'ambiguous-parallel-corridor',
   'spiral-known',
   'spiral-unknown',
 ]

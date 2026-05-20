@@ -20,6 +20,7 @@ export type ScenarioId =
   | 'follow-behind-human'
   | 'overtaking-human'
   | 'yielding-blocker'
+  | 'ambiguous-parallel-corridor'
   | 'spiral-known'
   | 'spiral-unknown'
 
@@ -170,6 +171,22 @@ const spiralEnvironment: Environment = {
   obstacles: [],
 }
 
+const ambiguousParallelCorridorEnvironment: Environment = {
+  goal: { x: 7.7, y: 2.05 },
+  goalRadius: 0.24,
+  walls: [
+    { id: 'near-lower-wall', a: { x: 0.4, y: 0.45 }, b: { x: 8.2, y: 0.45 } },
+    { id: 'near-upper-wall', a: { x: 0.4, y: 1.55 }, b: { x: 8.2, y: 1.55 } },
+    { id: 'far-lower-wall', a: { x: 0.4, y: 2.15 }, b: { x: 8.2, y: 2.15 } },
+    { id: 'far-upper-wall', a: { x: 0.4, y: 3.25 }, b: { x: 8.2, y: 3.25 } },
+    { id: 'left-connect-lower', a: { x: 0.4, y: 0.45 }, b: { x: 0.4, y: 1.55 } },
+    { id: 'right-connect-lower', a: { x: 8.2, y: 0.45 }, b: { x: 8.2, y: 1.55 } },
+    { id: 'left-connect-far', a: { x: 0.4, y: 2.15 }, b: { x: 0.4, y: 3.25 } },
+    { id: 'right-connect-far', a: { x: 8.2, y: 2.15 }, b: { x: 8.2, y: 3.25 } },
+  ],
+  obstacles: [],
+}
+
 export const scenarioDefinitions: ScenarioDefinition[] = [
   {
     id: 'crossing-human',
@@ -303,6 +320,17 @@ export const scenarioDefinitions: ScenarioDefinition[] = [
     environment: baseEnvironment,
   },
   {
+    id: 'ambiguous-parallel-corridor',
+    name: 'Ambiguous parallel corridor',
+    description: 'Two similar parallel lanes expose anonymous wall-observation association ambiguity.',
+    seed: 662,
+    initialRobot: { x: 1.05, y: 1.0, theta: 0 },
+    humans: [{ id: 'corridor-pedestrian', x: 4.8, y: 1.05, vx: -0.03, vy: 0, radius: 0.22 }],
+    environment: ambiguousParallelCorridorEnvironment,
+    initialBelief: (environment) =>
+      scenarioBelief(environment, { tMin: 0.06, tMax: 0.22 }, { x: 1.05, y: 1.0, theta: 0 }),
+  },
+  {
     id: 'spiral-known',
     name: 'Spiral corridor known map',
     description: 'A rectangular spiral corridor with the goal in the center and most walls already known in belief.',
@@ -393,6 +421,7 @@ function emptyMetrics() {
     poseHeadingError: 0,
     poseNormalizedError: 0,
     mapKnowledgeError: 0,
+    wallAssociationAccuracy: 1,
     selectedCost: 0,
     goalDistance: 0,
     goalReached: false,

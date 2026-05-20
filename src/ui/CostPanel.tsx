@@ -101,6 +101,10 @@ export function CostPanel({ cost, state }: Props) {
           <dd>{state.metrics.mapKnowledgeError.toFixed(2)}</dd>
         </div>
         <div>
+          <dt>wall assoc acc</dt>
+          <dd>{state.metrics.wallAssociationAccuracy.toFixed(2)}</dd>
+        </div>
+        <div>
           <dt>selected cost</dt>
           <dd>{state.metrics.selectedCost.toFixed(2)}</dd>
         </div>

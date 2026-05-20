@@ -22,6 +22,7 @@ describe('scenario definitions', () => {
       'follow-behind-human',
       'overtaking-human',
       'yielding-blocker',
+      'ambiguous-parallel-corridor',
       'spiral-known',
       'spiral-unknown',
     ])
@@ -68,5 +69,18 @@ describe('scenario definitions', () => {
       known.environment.walls.length / 2,
     )
     expect(unknown.belief.estimatedWalls.filter((wall) => wall.confidence > 0.1).length).toBeLessThan(3)
+  })
+
+  it('adds an ambiguous parallel corridor scenario with finite initial metrics', () => {
+    const state = createSimulationStateForScenario('ambiguous-parallel-corridor')
+
+    expect(state.environment.walls.filter((wall) => wall.id.includes('lower-wall')).length).toBeGreaterThanOrEqual(2)
+    expect(state.metrics.wallAssociationAccuracy).toBeGreaterThanOrEqual(0)
+    expect(state.metrics.wallAssociationAccuracy).toBeLessThanOrEqual(1)
+    expect(
+      Object.values(state.metrics).every(
+        (value) => value === null || typeof value === 'boolean' || Number.isFinite(value),
+      ),
+    ).toBe(true)
   })
 })

@@ -78,6 +78,7 @@ The scenario selector resets the simulator into deterministic, named experiment 
 - **Followed from behind**: a person comes from behind and keeps tracking the robot, testing rear social pressure rather than only frontal obstacles.
 - **Overtaking human**: a faster scripted person passes the robot on the outside and merges ahead.
 - **Yielding blocker**: a person initially blocks the corridor, then steps aside after a delay so the unified objective can move from stop/yield back to wall following.
+- **Ambiguous parallel corridor**: two similar parallel lanes make wall range/bearing observations nontrivial to associate anonymously.
 - **Spiral corridor known map**: a rectangular spiral corridor with the goal at the center and high initial wall-map confidence.
 - **Spiral corridor unknown map**: the same center-goal spiral, but only the entry wall starts with low confidence so observation gain and map uncertainty matter more.
 
@@ -97,7 +98,7 @@ The baselines are comparison tools, not alternative proposed methods. They inten
 
 The app includes a **Run comparison** button below the live metric panel. It runs deterministic headless replays in the browser with the same `stepSimulation` code used by the canvas animation, then shows one row per scenario and policy. The table is meant for quick side-by-side checks: lower social violations and near collisions are better, lower best goal distance means the robot got closer to the goal, and goal/time indicate whether the local receding-horizon controller reached the marker within the step bound.
 
-The headless API is also exported from `src/simulation/experimentRunner.ts` as `runScenarioBatch`, which defaults to every scenario and the three policy modes. The UI uses a focused batch of `crossing-human`, the new human-motion scenarios, and both spiral-map variants with `maxSteps: 240`.
+The headless API is also exported from `src/simulation/experimentRunner.ts` as `runScenarioBatch`, which defaults to every scenario and the three policy modes. The UI uses a focused batch of `crossing-human`, the new human-motion scenarios, the ambiguous parallel corridor, and both spiral-map variants with `maxSteps: 240`.
 
 Measured local batch results with default planner parameters and `maxSteps: 240`:
 
@@ -115,6 +116,9 @@ Measured local batch results with default planner parameters and `maxSteps: 240`
 | Yielding blocker | belief-mpc | no | - | 5.46m | 1.00m | 0 | 0 | 24.0s |
 | Yielding blocker | wall-only | yes | 23.8s | 0.20m | 0.21m | 24 | 0 | 0.0s |
 | Yielding blocker | reactive-stop | no | - | 5.44m | 0.81m | 0 | 0 | 26.5s |
+| Ambiguous parallel corridor | belief-mpc | no | - | 4.31m | 0.45m | 66 | 0 | 23.3s |
+| Ambiguous parallel corridor | wall-only | no | - | 0.75m | 0.76m | 0 | 99 | 0.0s |
+| Ambiguous parallel corridor | reactive-stop | no | - | 3.73m | 0.59m | 120 | 211 | 21.6s |
 | Spiral corridor known map | belief-mpc | no | - | 2.09m | 1.49m | 0 | 240 | 18.5s |
 | Spiral corridor known map | wall-only | no | - | 0.28m | 0.94m | 0 | 160 | 0.0s |
 | Spiral corridor known map | reactive-stop | no | - | 0.28m | 0.94m | 0 | 160 | 0.0s |
@@ -164,9 +168,10 @@ The metrics panel reports compact experiment readouts:
 - **Pose heading error**: absolute wrapped heading error between the true heading and `belief.pose.mean.theta`.
 - **Pose normalized error**: diagonal-covariance normalized pose error, using safe lower bounds for `x`, `y`, and heading variance.
 - **Map knowledge error**: true-map-backed score in `[0, 1]`; lower means estimated wall length is covered with higher confidence, while higher means coverage or confidence is poor.
+- **Wall association accuracy**: anonymous diagnostic score in `[0, 1]` over current wall observations. Each observation is scored against all true wall candidates with the same Gaussian range/bearing likelihood used by the wall observation model, using the observation's stored `sensorPose`; the metric is the fraction whose best-likelihood candidate matches the observation's true `wallId`. With no current observations it reports `1`, treating the empty set as no wrong associations.
 - **Selected cost**: total cost of the selected rollout for the current step.
 
-The pose and map-knowledge errors are inference-quality metrics for this approximation. They intentionally use simulator ground truth for evaluation only; the planner still consumes the lightweight belief state rather than a full SLAM posterior.
+The pose, map-knowledge, and wall-association errors are inference-quality metrics for this approximation. They intentionally use simulator ground truth for evaluation only; the planner still consumes the lightweight belief state rather than a full SLAM posterior.
 
 ## Cost terms
 
@@ -252,13 +257,13 @@ Algorithm code is kept independent from rendering. Rendering receives immutable-
 
 - Belief update is a pedagogical scalar covariance plus per-wall interval coverage approximation, not EKF/Graph-SLAM.
 - Wall visibility uses sampled wall points with line-of-sight occlusion, not continuous geometric clipping of full visible wall intervals.
-- Wall observations expose deterministic noisy measurements and a Gaussian wall likelihood, but data association is still by known `wallId`; there is no anonymous feature map, EKF, particle SLAM, or continuous ray-cast SLAM.
+- Wall observations expose deterministic noisy measurements and a Gaussian wall likelihood. Anonymous association is evaluated as a diagnostic metric, but map updates still use known `wallId`; there is no anonymous feature map, EKF, particle SLAM, or continuous ray-cast SLAM.
 - Candidate generation is simple sampling around a few motion templates, not full MPPI with weighted updates.
 - Human prediction is constant-velocity and does not model intent.
 - Wall selection is nearest-wall based; there is no global route or topological planner.
 - Safety constraints are soft penalties, so extreme parameter choices can still produce unsafe rollouts.
 - Baselines are deliberately simple and should not be interpreted as tuned controllers.
-- Metrics include simple inference-quality errors for pose and true-map-backed wall knowledge, but they are still lightweight geometric summaries rather than a statistical benchmark suite.
+- Metrics include simple inference-quality errors for pose, true-map-backed wall knowledge, and anonymous wall association, but they are still lightweight geometric summaries rather than a statistical benchmark suite.
 - Goal reaching is still local and receding-horizon. There is no global planner, so reaching remains scenario-dependent and can fail if the goal is permanently blocked or placed behind a route that the local candidate set cannot discover.
 
-Current roadmap position: this version adds pose and map inference-quality readouts for the belief-SLAM approximation. It still does not implement full probability-distribution belief state, anonymous wall data association, human-state belief, FastSLAM, POMCP, or a true POMDP planner.
+Current roadmap position: this version adds pose, map, and anonymous wall-association inference-quality readouts for the belief-SLAM approximation. It still does not implement full probability-distribution belief state, anonymous wall-map updates, human-state belief, FastSLAM, POMCP, or a true POMDP planner.

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { expectedRangeBearingToWall, observeWalls } from '../belief/wallMapBelief'
 import { defaultParameters } from './environment'
 import { createInitialMetrics, estimatedMapCoverage, updateSimulationMetrics } from './metrics'
 import { createSimulationStateForScenario } from './scenarios'
@@ -205,5 +206,41 @@ describe('simulation metrics', () => {
     }
 
     expect(estimatedMapCoverage(state.environment, fullFirstWall)).toBeGreaterThan(emptyCoverage)
+  })
+
+  it('reports bounded finite wall association accuracy', () => {
+    const state = createSimulationStateForScenario('crossing-human')
+    const currentObservations = observeWalls(state.robot, state.environment, defaultParameters)
+
+    const metrics = createInitialMetrics({ ...state, currentObservations }, defaultParameters)
+
+    expect(Number.isFinite(metrics.wallAssociationAccuracy)).toBe(true)
+    expect(metrics.wallAssociationAccuracy).toBeGreaterThanOrEqual(0)
+    expect(metrics.wallAssociationAccuracy).toBeLessThanOrEqual(1)
+  })
+
+  it('lowers wall association accuracy for a bad observation that fits another wall better', () => {
+    const state = createSimulationStateForScenario('ambiguous-parallel-corridor')
+    const trueWall = state.environment.walls.find((wall) => wall.id === 'near-lower-wall')
+    const wrongWall = state.environment.walls.find((wall) => wall.id === 'far-lower-wall')
+    if (!trueWall || !wrongWall) throw new Error('Missing ambiguous corridor walls')
+    const wrongExpected = expectedRangeBearingToWall(state.robot, wrongWall)
+    const badObservation = {
+      wallId: trueWall.id,
+      tMin: 0.2,
+      tMax: 0.8,
+      confidence: 0.9,
+      strength: 0.8,
+      range: wrongExpected.range,
+      bearing: wrongExpected.bearing,
+      rangeStdDev: 0.03,
+      bearingStdDev: 0.01,
+      rayTarget: wrongExpected.point,
+      sensorPose: state.robot,
+    }
+
+    const metrics = createInitialMetrics({ ...state, currentObservations: [badObservation] }, defaultParameters)
+
+    expect(metrics.wallAssociationAccuracy).toBeLessThan(1)
   })
 })

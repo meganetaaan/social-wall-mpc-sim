@@ -27,6 +27,12 @@ export type ObservationLikelihood = {
   logLikelihood: number
 }
 
+export type WallAssociation = {
+  wallId: string | null
+  likelihood: ObservationLikelihood
+  affinity: number
+}
+
 function hashObservationSeed(input: string) {
   let hash = 2166136261
   for (let i = 0; i < input.length; i += 1) {
@@ -91,6 +97,49 @@ export function wallObservationAffinity(
     (likelihood.rangeResidual / likelihood.rangeSigma) ** 2 +
     (likelihood.bearingResidual / likelihood.bearingSigma) ** 2
   return clamp01(Math.exp(-0.5 * mahalanobisSquared))
+}
+
+export function associateWallObservation(
+  observation: Pick<WallObservation, 'range' | 'bearing' | 'rangeStdDev' | 'bearingStdDev' | 'sensorPose'>,
+  candidateWalls: WallSegment[],
+): WallAssociation {
+  let best: WallAssociation | undefined
+  for (const wall of candidateWalls) {
+    const likelihood = wallObservationLikelihood(observation, observation.sensorPose, wall)
+    const affinity = wallObservationAffinity(observation, observation.sensorPose, wall)
+    if (!best || likelihood.logLikelihood > best.likelihood.logLikelihood) {
+      best = { wallId: wall.id, likelihood, affinity }
+    }
+  }
+
+  return (
+    best ?? {
+      wallId: null,
+      likelihood: {
+        rangeResidual: Number.POSITIVE_INFINITY,
+        bearingResidual: Number.POSITIVE_INFINITY,
+        rangeSigma: 1,
+        bearingSigma: 1,
+        likelihood: 0,
+        logLikelihood: Number.NEGATIVE_INFINITY,
+      },
+      affinity: 0,
+    }
+  )
+}
+
+export function wallAssociationAccuracy(
+  observations: Pick<
+    WallObservation,
+    'wallId' | 'range' | 'bearing' | 'rangeStdDev' | 'bearingStdDev' | 'sensorPose'
+  >[],
+  candidateWalls: WallSegment[],
+) {
+  if (observations.length === 0) return 1
+  const correct = observations.filter(
+    (observation) => associateWallObservation(observation, candidateWalls).wallId === observation.wallId,
+  ).length
+  return correct / observations.length
 }
 
 export function noisyRangeBearingMeasurement(robot: RobotState, point: Vec2, p: PlannerParameters, key: string) {

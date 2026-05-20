@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { defaultParameters } from '../simulation/environment'
 import { distance, normAngle } from '../simulation/math'
-import type { Environment, EstimatedWallSegment, RobotState } from '../simulation/types'
+import type { Environment, EstimatedWallSegment, RobotState, WallObservation } from '../simulation/types'
 import {
+  associateWallObservation,
   computeMapUncertainty,
   expectedRangeBearingToWall,
   observedCoverageRatio,
   observeWalls,
   updateEstimatedWallBelief,
+  wallAssociationAccuracy,
   wallObservationAffinity,
   wallObservationLikelihood,
 } from './wallMapBelief'
@@ -44,6 +46,62 @@ describe('wall map observation model', () => {
     expect(matching.logLikelihood).toBeGreaterThan(wrong.logLikelihood)
     expect(matching.likelihood).toBeGreaterThan(wrong.likelihood)
     expect(Number.isFinite(matching.likelihood)).toBe(true)
+  })
+
+  it('associates an anonymous wall observation to the best-likelihood candidate wall', () => {
+    const robot: RobotState = { x: 0, y: 0, theta: 0 }
+    const wall = environment.walls[0]
+    const expected = expectedRangeBearingToWall(robot, wall)
+    const observation: WallObservation = {
+      wallId: 'front-wall',
+      tMin: 0.25,
+      tMax: 0.75,
+      confidence: 0.9,
+      strength: 0.8,
+      range: expected.range,
+      bearing: expected.bearing,
+      rangeStdDev: 0.05,
+      bearingStdDev: 0.02,
+      rayTarget: expected.point,
+      sensorPose: robot,
+    }
+
+    const association = associateWallObservation(observation, [
+      { id: 'wrong-wall', a: { x: 2, y: -1 }, b: { x: 2, y: 1 } },
+      wall,
+    ])
+
+    expect(association.wallId).toBe('front-wall')
+    expect(association.likelihood.logLikelihood).toBeGreaterThan(
+      wallObservationLikelihood(observation, robot, { id: 'wrong-wall', a: { x: 2, y: -1 }, b: { x: 2, y: 1 } })
+        .logLikelihood,
+    )
+  })
+
+  it('drops association accuracy when an observation fits a different wall better than its true wall id', () => {
+    const robot: RobotState = { x: 0, y: 0, theta: 0 }
+    const trueWall = environment.walls[0]
+    const wrongWall = { id: 'wrong-wall', a: { x: 2, y: -1 }, b: { x: 2, y: 1 } }
+    const wrongExpected = expectedRangeBearingToWall(robot, wrongWall)
+    const badObservation: WallObservation = {
+      wallId: trueWall.id,
+      tMin: 0.25,
+      tMax: 0.75,
+      confidence: 0.9,
+      strength: 0.8,
+      range: wrongExpected.range,
+      bearing: wrongExpected.bearing,
+      rangeStdDev: 0.05,
+      bearingStdDev: 0.02,
+      rayTarget: wrongExpected.point,
+      sensorPose: robot,
+    }
+
+    expect(wallAssociationAccuracy([badObservation], [trueWall, wrongWall])).toBeLessThan(1)
+  })
+
+  it('treats no wall observations as vacuously correct association accuracy', () => {
+    expect(wallAssociationAccuracy([], environment.walls)).toBe(1)
   })
 
   it('converts observation likelihood residuals to a bounded wall affinity', () => {

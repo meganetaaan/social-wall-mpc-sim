@@ -125,6 +125,7 @@ export type SimulationMetrics = {
   poseHeadingError: number
   poseNormalizedError: number
   mapKnowledgeError: number
+  wallAssociationAccuracy: number
   selectedCost: number
   goalDistance: number
   goalReached: boolean

@@ -26,6 +26,7 @@ export function stepSimulation(
     belief,
     control: plan.bestControl,
     selectedCost: plan.selected.cost.total,
+    currentObservations,
     parameters,
   })
   return {
