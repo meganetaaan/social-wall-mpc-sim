@@ -105,7 +105,8 @@ export function goalProgressCost(
   environment: Environment,
   p: Pick<PlannerParameters, 'wGoalProgress'>,
 ) {
-  const goalHeading = Math.atan2(environment.goal.y - robot.y, environment.goal.x - robot.x)
+  const target = activeRouteTarget(robot, environment)
+  const goalHeading = Math.atan2(target.y - robot.y, target.x - robot.x)
   return -p.wGoalProgress * control.v * Math.cos(normAngle(robot.theta - goalHeading))
 }
 
@@ -114,7 +115,14 @@ export function terminalGoalCost(
   environment: Environment,
   p: Pick<PlannerParameters, 'wGoalTerminal'>,
 ) {
-  return p.wGoalTerminal * distance(robot, environment.goal) ** 2
+  return p.wGoalTerminal * distance(robot, activeRouteTarget(robot, environment)) ** 2
+}
+
+function activeRouteTarget(robot: RobotState, environment: Environment) {
+  const route = environment.routeWaypoints
+  if (!route?.length) return environment.goal
+  const arrivalRadius = Math.max(environment.goalRadius ?? 0.2, 0.35)
+  return route.find((waypoint) => distance(robot, waypoint) > arrivalRadius) ?? environment.goal
 }
 
 export function expectedObservationGain(

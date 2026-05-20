@@ -152,6 +152,18 @@ const unknownMapBelief = (environment: Environment, mean: RobotState = { x: 0.85
 const spiralEnvironment: Environment = {
   goal: { x: 5.0, y: 2.5 },
   goalRadius: 0.24,
+  routeWaypoints: [
+    { x: 8.85, y: 0.7 },
+    { x: 8.85, y: 4.3 },
+    { x: 1.05, y: 4.3 },
+    { x: 1.05, y: 1.4 },
+    { x: 7.8, y: 1.4 },
+    { x: 7.8, y: 3.6 },
+    { x: 2.1, y: 3.6 },
+    { x: 2.1, y: 2.05 },
+    { x: 5.0, y: 2.05 },
+    { x: 5.0, y: 2.5 },
+  ],
   walls: [
     { id: 'spiral-outer-bottom', a: { x: 0.35, y: 0.35 }, b: { x: 9.45, y: 0.35 } },
     { id: 'spiral-outer-right', a: { x: 9.45, y: 0.35 }, b: { x: 9.45, y: 4.65 } },

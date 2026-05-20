@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { poseGaussianFromSigmas } from '../belief/poseBelief'
 import { defaultParameters } from '../simulation/environment'
-import type { BeliefState, ControlInput, HumanState, RobotState, WallSegment } from '../simulation/types'
-import { evaluateStageCost, humanSocialDistanceCost, wallFollowingCost } from './cost'
+import type { BeliefState, ControlInput, Environment, HumanState, RobotState, WallSegment } from '../simulation/types'
+import {
+  evaluateStageCost,
+  goalProgressCost,
+  humanSocialDistanceCost,
+  terminalGoalCost,
+  wallFollowingCost,
+} from './cost'
 
 const wall: WallSegment = { id: 'north-wall', a: { x: 0, y: 0 }, b: { x: 10, y: 0 } }
 const robot: RobotState = { x: 1, y: 1, theta: 0 }
@@ -93,5 +99,40 @@ describe('modular MPC cost terms', () => {
     })
 
     expect(forward.terms.goalProgress).toBeLessThan(stopped.terms.goalProgress)
+  })
+
+  it('uses route waypoints instead of the final Euclidean goal for maze-like local progress', () => {
+    const mazeEnvironment: Environment = {
+      walls: [wall],
+      obstacles: [],
+      goal: { x: 5, y: 2.5 },
+      routeWaypoints: [
+        { x: 7.8, y: 1.4 },
+        { x: 7.8, y: 3.6 },
+        { x: 5, y: 2.5 },
+      ],
+    }
+    const underGoalRobot: RobotState = { x: 5, y: 1.4, theta: 0 }
+
+    expect(goalProgressCost(underGoalRobot, { v: 0.6, omega: 0 }, mazeEnvironment, defaultParameters)).toBeLessThan(
+      goalProgressCost(underGoalRobot, { v: 0, omega: 0 }, mazeEnvironment, defaultParameters),
+    )
+  })
+
+  it('uses the active route waypoint for terminal rollout cost before the final goal', () => {
+    const mazeEnvironment: Environment = {
+      walls: [wall],
+      obstacles: [],
+      goal: { x: 5, y: 2.5 },
+      routeWaypoints: [
+        { x: 7.8, y: 1.4 },
+        { x: 7.8, y: 3.6 },
+        { x: 5, y: 2.5 },
+      ],
+    }
+
+    expect(terminalGoalCost({ x: 7.8, y: 1.4, theta: 0 }, mazeEnvironment, defaultParameters)).toBeLessThan(
+      terminalGoalCost({ x: 5, y: 1.4, theta: 0 }, mazeEnvironment, defaultParameters),
+    )
   })
 })

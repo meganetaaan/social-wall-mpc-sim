@@ -66,6 +66,8 @@ describe('scenario definitions', () => {
     expect(unknown.environment.walls.length).toBe(known.environment.walls.length)
     expect(known.environment.goal.x).toBeCloseTo(5, 1)
     expect(known.environment.goal.y).toBeCloseTo(2.5, 1)
+    expect(known.environment.routeWaypoints?.length).toBeGreaterThanOrEqual(8)
+    expect(unknown.environment.routeWaypoints).toEqual(known.environment.routeWaypoints)
     expect(known.humans).toEqual([])
     expect(unknown.humans).toEqual([])
     expect(known.belief.estimatedWalls.filter((wall) => wall.confidence > 0.6).length).toBeGreaterThan(

@@ -43,7 +43,13 @@ export type WallObservation = {
   sensorPose: RobotState
 }
 export type StaticObstacle = { id: string; x: number; y: number; radius: number }
-export type Environment = { walls: WallSegment[]; obstacles: StaticObstacle[]; goal: Vec2; goalRadius?: number }
+export type Environment = {
+  walls: WallSegment[]
+  obstacles: StaticObstacle[]
+  goal: Vec2
+  goalRadius?: number
+  routeWaypoints?: Vec2[]
+}
 export type BeliefState = {
   pose: PoseGaussian
   sigmaX: number
