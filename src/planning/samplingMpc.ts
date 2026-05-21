@@ -45,6 +45,9 @@ function sampleControlSequence(
   if (index === 5 && state.environment.valueField) return guideValueFieldSequence(state, p)
   const templates: ControlInput[] = [
     { v: 0, omega: 0 },
+    { v: -0.18, omega: 0 },
+    { v: -0.12, omega: -0.45 },
+    { v: -0.12, omega: 0.45 },
     { v: 0.18, omega: headingError * 0.8 },
     { v: 0.45, omega: headingError },
     { v: 0.25, omega: -0.8 },

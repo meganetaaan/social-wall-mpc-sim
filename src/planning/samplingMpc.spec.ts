@@ -76,6 +76,38 @@ describe('sampling MPC planner', () => {
     expect(result.bestControl.v).toBeLessThan(clear.bestControl.v)
   })
 
+  it('can reverse away from a likely human blocker when reverse motion is allowed', () => {
+    const state = createDefaultSimulationState()
+    const blocked = {
+      ...state,
+      humans: [],
+      belief: {
+        ...state.belief,
+        objectBeliefs: [
+          {
+            id: 'belief-blocker',
+            centroid: { x: state.robot.x + 0.75, y: state.robot.y },
+            velocity: { x: 0, y: 0 },
+            radius: 0.25,
+            observedCount: 3,
+            lastObservedAt: state.time,
+            pStatic: 0.1,
+            pDynamic: 0.9,
+            pHuman: 0.95,
+          },
+        ],
+      },
+    }
+
+    const result = planSamplingMpc({
+      state: blocked,
+      parameters: { ...defaultParameters, sampleCount: 48, horizonSteps: 6, dMin: 0.9 },
+      seed: 8,
+    })
+
+    expect(result.bestControl.v).toBeLessThan(0)
+  })
+
   it('keeps moving along a spiral value field instead of stalling on an early plateau', () => {
     const state = createSimulationStateForScenario('spiral-known')
     const earlyPlateau = {

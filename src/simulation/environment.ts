@@ -21,7 +21,7 @@ export const defaultParameters: PlannerParameters = {
   wProgress: 3.5,
   wGoalProgress: 18,
   wGoalTerminal: 40,
-  vMin: 0,
+  vMin: -0.28,
   vMax: 0.85,
   omegaMin: -1.6,
   omegaMax: 1.6,
