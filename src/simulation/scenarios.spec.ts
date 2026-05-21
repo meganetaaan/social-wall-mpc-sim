@@ -24,6 +24,8 @@ describe('scenario definitions', () => {
       'overtaking-human',
       'yielding-blocker',
       'ambiguous-parallel-corridor',
+      'occluded-corner-human',
+      'kidnapped-pose-bend',
       'spiral-known',
       'spiral-unknown',
     ])
@@ -111,5 +113,24 @@ describe('scenario definitions', () => {
         (value) => value === null || typeof value === 'boolean' || Number.isFinite(value),
       ),
     ).toBe(true)
+  })
+
+  it('adds occluded and kidnapped-pose gap scenarios with finite initial metrics', () => {
+    const occluded = createSimulationStateForScenario('occluded-corner-human')
+    const kidnapped = createSimulationStateForScenario('kidnapped-pose-bend')
+
+    expect(occluded.humans.some((human) => human.id.includes('occluded'))).toBe(true)
+    expect(occluded.environment.walls.some((wall) => wall.id.includes('corner-occluder'))).toBe(true)
+    expect(kidnapped.belief.pose.mean.x).not.toBeCloseTo(kidnapped.robot.x, 1)
+    expect(kidnapped.belief.sigmaX).toBeGreaterThan(0.3)
+    expect(kidnapped.belief.sigmaY).toBeGreaterThan(0.3)
+
+    for (const state of [occluded, kidnapped]) {
+      expect(
+        Object.values(state.metrics).every(
+          (value) => value === null || typeof value === 'boolean' || Number.isFinite(value),
+        ),
+      ).toBe(true)
+    }
   })
 })

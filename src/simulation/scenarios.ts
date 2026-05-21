@@ -23,6 +23,8 @@ export type ScenarioId =
   | 'overtaking-human'
   | 'yielding-blocker'
   | 'ambiguous-parallel-corridor'
+  | 'occluded-corner-human'
+  | 'kidnapped-pose-bend'
   | 'spiral-known'
   | 'spiral-unknown'
 
@@ -197,6 +199,30 @@ const ambiguousParallelCorridorEnvironment: Environment = {
   obstacles: [],
 }
 
+const occludedCornerEnvironment: Environment = {
+  ...bendEnvironment,
+  goal: { x: 8.7, y: 3.55 },
+  walls: [
+    ...bendEnvironment.walls,
+    { id: 'corner-occluder-short-wall', a: { x: 4.15, y: 1.6 }, b: { x: 4.15, y: 2.35 } },
+  ],
+  obstacles: [...bendEnvironment.obstacles, { id: 'corner-occluder-pillar', x: 4.35, y: 1.95, radius: 0.26 }],
+}
+
+const kidnappedPoseBelief = (environment: Environment): BeliefState => {
+  const sigmaX = 0.48
+  const sigmaY = 0.44
+  const sigmaTheta = 0.22
+  return {
+    ...scenarioBelief(environment, { tMin: 0.04, tMax: 0.18 }, { x: 1.78, y: 1.28, theta: 0.16 }),
+    pose: poseGaussianFromSigmas({ x: 1.78, y: 1.28, theta: 0.16 }, sigmaX, sigmaY, sigmaTheta),
+    sigmaX,
+    sigmaY,
+    sigmaTheta,
+    mapConfidence: 0.18,
+  }
+}
+
 export const scenarioDefinitions: ScenarioDefinition[] = [
   {
     id: 'crossing-human',
@@ -339,6 +365,27 @@ export const scenarioDefinitions: ScenarioDefinition[] = [
     environment: ambiguousParallelCorridorEnvironment,
     initialBelief: (environment) =>
       scenarioBelief(environment, { tMin: 0.06, tMax: 0.22 }, { x: 1.05, y: 1.0, theta: 0 }),
+  },
+  {
+    id: 'occluded-corner-human',
+    name: 'Occluded corner human',
+    description: 'A pedestrian is hidden just past a bend, exposing object-belief latency around occlusions.',
+    seed: 684,
+    initialRobot: { x: 0.95, y: 0.88, theta: 0 },
+    humans: [{ id: 'occluded-corner-human', x: 4.95, y: 2.18, vx: -0.02, vy: -0.08, radius: 0.23 }],
+    environment: occludedCornerEnvironment,
+    initialBelief: (environment) =>
+      scenarioBelief(environment, { tMin: 0.04, tMax: 0.18 }, { x: 0.95, y: 0.88, theta: 0 }),
+  },
+  {
+    id: 'kidnapped-pose-bend',
+    name: 'Kidnapped pose bend',
+    description: 'The true robot starts in a bend while pose belief is offset and broad, stressing E[V] recovery.',
+    seed: 696,
+    initialRobot: { x: 0.95, y: 0.88, theta: 0 },
+    humans: [{ id: 'kidnapped-bend-pedestrian', x: 5.8, y: 2.25, vx: 0.02, vy: -0.04, radius: 0.23 }],
+    environment: bendEnvironment,
+    initialBelief: kidnappedPoseBelief,
   },
   {
     id: 'spiral-known',

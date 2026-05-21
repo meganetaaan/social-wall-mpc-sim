@@ -74,6 +74,32 @@ describe('headless experiment runner', () => {
     ])
   })
 
+  it('covers new POMDP/SLAM gap scenarios in deterministic headless replay', () => {
+    const result = runScenarioBatch({
+      scenarioIds: ['ambiguous-parallel-corridor', 'occluded-corner-human', 'kidnapped-pose-bend'] as const,
+      plannerModes: ['belief-mpc'] as const,
+      parameters: { sampleCount: 8, horizonSteps: 5 },
+      maxSteps: 30,
+    })
+
+    expect(result.summaries.map((summary) => summary.scenarioId)).toEqual([
+      'ambiguous-parallel-corridor',
+      'occluded-corner-human',
+      'kidnapped-pose-bend',
+    ])
+    expect(
+      result.summaries.every((summary) =>
+        [
+          summary.finalGoalDistance,
+          summary.bestGoalDistance,
+          summary.wallAssociationAccuracy,
+          summary.poseNormalizedError,
+          summary.mapKnowledgeError,
+        ].every(Number.isFinite),
+      ),
+    ).toBe(true)
+  })
+
   it('summarizes batch rows with readable labels and finite numeric metrics', () => {
     const result = runScenarioBatch({
       scenarioIds: ['crossing-human'],
