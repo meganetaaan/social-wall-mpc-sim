@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultSimulationState, defaultParameters } from './environment'
+import { createSimulationStateForScenario } from './scenarios'
 import { stepSimulation } from './simulator'
 
 describe('simulator integration', () => {
@@ -14,5 +15,13 @@ describe('simulator integration', () => {
     expect(next.plan.candidates.length).toBe(12)
     expect(next.costBreakdown.total).toBe(next.plan.selected.cost.total)
     expect(next.belief.sigmaX + next.belief.sigmaY).toBeGreaterThan(0)
+  })
+
+  it('updates anonymous line-feature belief and recomputes a value field during the normal belief-mpc step', () => {
+    const state = createSimulationStateForScenario('crossing-human')
+    const next = stepSimulation(state, { ...defaultParameters, sampleCount: 4, horizonSteps: 3 }, 11, 'belief-mpc')
+
+    expect(next.belief.estimatedFeatures?.some((feature) => feature.id.startsWith('feature-'))).toBe(true)
+    expect(next.environment.valueField).toBeDefined()
   })
 })

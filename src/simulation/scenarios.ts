@@ -42,7 +42,13 @@ export type ScenarioDefinition = {
 const defaultWallTargetDistance = 0.85
 const defaultPoseMean: RobotState = { x: 0, y: 0, theta: 0 }
 
-const baseEnvironment: Environment = {
+const valueFieldOptions = spiralValueFieldOptions
+
+function withValueField(environment: Environment): Environment {
+  return { ...environment, valueField: createGridValueField(environment, valueFieldOptions) }
+}
+
+const baseEnvironment: Environment = withValueField({
   goal: { x: 7.1, y: 2.7 },
   goalRadius: 0.21,
   walls: [
@@ -59,7 +65,7 @@ const baseEnvironment: Environment = {
     { id: 'left-short-wall', a: { x: 0.3, y: 0.2 }, b: { x: 0.3, y: 4.2 } },
   ],
   obstacles: [{ id: 'pillar', x: 7.7, y: 2.15, radius: 0.25 }],
-}
+})
 
 const bendEnvironment: Environment = {
   ...baseEnvironment,
@@ -183,7 +189,7 @@ const spiralEnvironment: Environment = {
   valueField: createGridValueField(spiralEnvironmentBase, spiralValueFieldOptions),
 }
 
-const ambiguousParallelCorridorEnvironment: Environment = {
+const ambiguousParallelCorridorEnvironment: Environment = withValueField({
   goal: { x: 7.7, y: 2.05 },
   goalRadius: 0.24,
   walls: [
@@ -197,7 +203,7 @@ const ambiguousParallelCorridorEnvironment: Environment = {
     { id: 'right-connect-far', a: { x: 8.2, y: 2.15 }, b: { x: 8.2, y: 3.25 } },
   ],
   obstacles: [],
-}
+})
 
 const occludedCornerEnvironment: Environment = {
   ...bendEnvironment,

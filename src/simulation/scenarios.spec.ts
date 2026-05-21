@@ -133,4 +133,12 @@ describe('scenario definitions', () => {
       ).toBe(true)
     }
   })
+
+  it('provides a value field for every scenario instead of scenario-specific navigation rules', () => {
+    for (const scenario of scenarioDefinitions) {
+      const state = createSimulationStateForScenario(scenario.id)
+
+      expect(state.environment.valueField, scenario.id).toBeDefined()
+    }
+  })
 })

@@ -31,6 +31,7 @@ export function stepSimulation(
     parameters,
     time: state.time + parameters.dt,
     pointObservations: currentPointObservations,
+    mapUpdateMode: 'anonymous-line-features',
   })
   const environment = environmentWithBeliefValueField(state.environment, belief)
   const currentObservations = observeWalls(robot, environment, parameters)

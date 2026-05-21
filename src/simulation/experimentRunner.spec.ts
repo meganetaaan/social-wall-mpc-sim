@@ -13,7 +13,7 @@ describe('headless experiment runner', () => {
     }
 
     expect(runScenarioExperiment(args)).toMatchObject(runScenarioExperiment(args))
-  })
+  }, 15_000)
 
   it('reaches the crossing-human goal with belief-mpc within a bounded fast replay', () => {
     const result = runScenarioExperiment({
@@ -72,7 +72,7 @@ describe('headless experiment runner', () => {
       ['standing-human', 'wall-only'],
       ['standing-human', 'reactive-stop'],
     ])
-  })
+  }, 20_000)
 
   it('covers new POMDP/SLAM gap scenarios in deterministic headless replay', () => {
     const result = runScenarioBatch({

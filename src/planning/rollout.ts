@@ -68,6 +68,7 @@ export function rolloutCandidate(args: {
       observedRobot: robot,
       environment: args.environment,
       parameters: args.parameters,
+      mapUpdateMode: 'anonymous-line-features',
     })
     trajectory.push(robot)
     predictedHumans.push(humans)
