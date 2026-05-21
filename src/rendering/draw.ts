@@ -1,3 +1,4 @@
+import { valueFieldDescentHeading } from '../planning/valueField'
 import { goalRadius } from '../simulation/goal'
 import type {
   BeliefState,
@@ -238,26 +239,21 @@ function drawValueFieldArrows(
   field: NonNullable<Environment['valueField']>,
   transform: Transform,
 ) {
-  const stride = Math.max(2, Math.round(0.8 / field.resolution))
+  const stride = Math.max(1, Math.round(0.4 / field.resolution))
   ctx.strokeStyle = 'rgba(250, 204, 21, 0.82)'
   ctx.lineWidth = 1.5
   for (let y = 0; y < field.height; y += stride) {
     for (let x = 0; x < field.width; x += stride) {
       const here = field.values[y * field.width + x]
       if (!Number.isFinite(here) || here >= field.unreachableCost) continue
-      const right = x + 1 < field.width ? field.values[y * field.width + x + 1] : here
-      const up = y + 1 < field.height ? field.values[(y + 1) * field.width + x] : here
-      const dx = right < here ? 1 : 0
-      const dy = up < here ? 1 : 0
-      if (dx === 0 && dy === 0) continue
-      const start = worldToCanvas(
-        { x: field.origin.x + x * field.resolution, y: field.origin.y + y * field.resolution },
-        transform,
-      )
+      const world = { x: field.origin.x + x * field.resolution, y: field.origin.y + y * field.resolution }
+      const descent = valueFieldDescentHeading(field, world, { searchRadiusCells: 3 })
+      if (!descent) continue
+      const start = worldToCanvas(world, transform)
       const length = field.resolution * transform.scale * 1.4
       ctx.beginPath()
       ctx.moveTo(start.x, start.y)
-      ctx.lineTo(start.x + dx * length, start.y - dy * length)
+      ctx.lineTo(start.x + Math.cos(descent.heading) * length, start.y - Math.sin(descent.heading) * length)
       ctx.stroke()
     }
   }

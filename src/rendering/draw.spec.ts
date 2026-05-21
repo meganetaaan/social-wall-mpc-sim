@@ -4,6 +4,8 @@ import { drawScene } from './draw'
 
 function createRecordingContext() {
   const calls: string[] = []
+  let strokeStyle = ''
+  let currentMove: { x: number; y: number } | null = null
   const ctx = {
     set fillStyle(value: string) {
       calls.push(`fillStyle:${value}`)
@@ -12,10 +14,11 @@ function createRecordingContext() {
       return ''
     },
     set strokeStyle(value: string) {
+      strokeStyle = value
       calls.push(`strokeStyle:${value}`)
     },
     get strokeStyle() {
-      return ''
+      return strokeStyle
     },
     set lineWidth(_value: number) {},
     get lineWidth() {
@@ -31,8 +34,12 @@ function createRecordingContext() {
     fill: () => calls.push('fill'),
     fillRect: () => {},
     fillText: (text: string) => calls.push(`fillText:${text}`),
-    lineTo: () => {},
-    moveTo: () => {},
+    lineTo: (x: number, y: number) => {
+      if (currentMove) calls.push(`line:${strokeStyle}:${currentMove.x},${currentMove.y}->${x},${y}`)
+    },
+    moveTo: (x: number, y: number) => {
+      currentMove = { x, y }
+    },
     stroke: () => calls.push('stroke'),
   } as unknown as CanvasRenderingContext2D
   return { ctx, calls }
@@ -102,6 +109,80 @@ describe('drawScene', () => {
     expect(calls.some((call) => call.startsWith('fillStyle:rgba(14, 165, 233'))).toBe(true)
     expect(calls.some((call) => call.startsWith('fillStyle:rgba(250, 204, 21'))).toBe(true)
     expect(calls).toContain('strokeStyle:rgba(250, 204, 21, 0.82)')
+  })
+
+  it('draws value-field descent arrows toward lower-value neighbors in any direction', () => {
+    const { ctx, calls } = createRecordingContext()
+
+    drawScene({
+      ctx,
+      width: 800,
+      height: 480,
+      environment: {
+        goal: { x: 0, y: 0 },
+        walls: [],
+        obstacles: [],
+        valueField: {
+          origin: { x: 0, y: 0 },
+          width: 3,
+          height: 1,
+          resolution: 0.8,
+          values: [1, 2, 3],
+          unreachableCost: 1_000_000,
+        },
+      },
+      robot: { x: 0, y: 0, theta: 0 },
+      humans: [],
+      trace: [],
+      candidates: [],
+      dMin: 0.7,
+      dPref: 1.5,
+      sensorRadius: 2,
+      sensorFov: Math.PI / 2,
+    })
+
+    const yellowLines = calls.filter((call) => call.startsWith('line:rgba(250, 204, 21'))
+    expect(
+      yellowLines.some((call) => {
+        const match = call.match(/:(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)->(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/)
+        if (!match) return false
+        return Number(match[3]) < Number(match[1])
+      }),
+    ).toBe(true)
+  })
+
+  it('samples value-field arrows densely enough for narrow corridors', () => {
+    const { ctx, calls } = createRecordingContext()
+
+    drawScene({
+      ctx,
+      width: 800,
+      height: 480,
+      environment: {
+        goal: { x: 0, y: 0 },
+        walls: [],
+        obstacles: [],
+        valueField: {
+          origin: { x: 0, y: 0 },
+          width: 5,
+          height: 1,
+          resolution: 0.2,
+          values: [1, 2, 3, 4, 5],
+          unreachableCost: 1_000_000,
+        },
+      },
+      robot: { x: 0, y: 0, theta: 0 },
+      humans: [],
+      trace: [],
+      candidates: [],
+      dMin: 0.7,
+      dPref: 1.5,
+      sensorRadius: 2,
+      sensorFov: Math.PI / 2,
+    })
+
+    const yellowLines = calls.filter((call) => call.startsWith('line:rgba(250, 204, 21'))
+    expect(yellowLines.length).toBeGreaterThanOrEqual(2)
   })
 
   it('draws wall map confidence as a belief layer', () => {
