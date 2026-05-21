@@ -54,7 +54,12 @@ export function humanSocialDistanceCost(robot: RobotState, humans: HumanState[],
   return { total }
 }
 
-export function objectSocialDistanceCost(robot: RobotState, objects: ObjectBelief[], p: PlannerParameters) {
+export function objectSocialDistanceCost(
+  robot: RobotState,
+  objects: ObjectBelief[],
+  p: PlannerParameters,
+  control?: ControlInput,
+) {
   let total = 0
   for (const object of objects) {
     const r = distance({ x: robot.x, y: robot.y }, object.centroid)
@@ -64,6 +69,13 @@ export function objectSocialDistanceCost(robot: RobotState, objects: ObjectBelie
     } else {
       total += (humanWeight * (p.wHuman * 0.25)) / Math.max(0.03, r - p.dMin) ** 2
       total += humanWeight * p.wHuman * Math.max(0, Math.abs(r - p.dPref) - p.dTolerance) ** 2
+    }
+    if (control && control.v > 0 && r < p.dPref) {
+      const objectHeading = Math.atan2(object.centroid.y - robot.y, object.centroid.x - robot.x)
+      const closingSpeed = control.v * Math.cos(normAngle(robot.theta - objectHeading))
+      if (closingSpeed > 0) {
+        total += (humanWeight * p.wHuman * 120 * closingSpeed ** 2) / Math.max(0.05, r - p.robotRadius) ** 2
+      }
     }
   }
   return { total }
@@ -103,7 +115,7 @@ export function evaluateStageCost(args: {
   const wall = wallFollowingCost(robot, nearest.wall, parameters)
   terms.wall = wall.distance
   terms.wallHeading = wall.heading
-  terms.human = objectSocialDistanceCost(robot, belief.objectBeliefs ?? [], parameters).total
+  terms.human = objectSocialDistanceCost(robot, belief.objectBeliefs ?? [], parameters, control).total
   terms.collision = collisionCost(robot, environment, humans, parameters)
   terms.control = parameters.wControlV * control.v ** 2 + parameters.wControlOmega * control.omega ** 2
   terms.smoothness =

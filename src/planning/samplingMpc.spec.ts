@@ -39,20 +39,41 @@ describe('sampling MPC planner', () => {
     expect(result.selected.controls.length).toBe(1)
   })
 
-  it('can prefer stopping when a human blocks every safe forward rollout', () => {
+  it('slows down when object belief estimates a likely human blocker ahead', () => {
     const state = createDefaultSimulationState()
     const blocked = {
       ...state,
-      humans: [{ id: 'blocking-human', x: state.robot.x + 0.25, y: state.robot.y, vx: 0, vy: 0, radius: 0.25 }],
+      humans: [],
+      belief: {
+        ...state.belief,
+        objectBeliefs: [
+          {
+            id: 'belief-blocker',
+            centroid: { x: state.robot.x + 0.75, y: state.robot.y },
+            velocity: { x: 0, y: 0 },
+            radius: 0.25,
+            observedCount: 3,
+            lastObservedAt: state.time,
+            pStatic: 0.1,
+            pDynamic: 0.9,
+            pHuman: 0.95,
+          },
+        ],
+      },
     }
 
+    const clear = planSamplingMpc({
+      state,
+      parameters: { ...defaultParameters, sampleCount: 36, horizonSteps: 6, dMin: 0.9, wHuman: 16 },
+      seed: 8,
+    })
     const result = planSamplingMpc({
       state: blocked,
       parameters: { ...defaultParameters, sampleCount: 36, horizonSteps: 6, dMin: 0.9, wHuman: 16 },
       seed: 8,
     })
 
-    expect(result.bestControl.v).toBeLessThan(0.08)
+    expect(result.bestControl.v).toBeLessThan(clear.bestControl.v)
   })
 
   it('keeps moving along a spiral value field instead of stalling on an early plateau', () => {

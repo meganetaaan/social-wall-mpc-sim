@@ -1,8 +1,36 @@
 import { clampControl, stepRobotInEnvironment } from '../simulation/dynamics'
 import { mulberry32, nearestWall, normAngle, wallTangentAngle } from '../simulation/math'
-import type { ControlInput, PlannerParameters, PlanningResult, SimulationState } from '../simulation/types'
+import type {
+  ControlInput,
+  ObjectBelief,
+  PlannerParameters,
+  PlanningResult,
+  RobotState,
+  SimulationState,
+} from '../simulation/types'
 import { rolloutCandidate } from './rollout'
 import { valueFieldDescentHeading } from './valueField'
+
+function beliefObjectVelocityCap(robot: RobotState, objects: ObjectBelief[] | undefined, p: PlannerParameters) {
+  let cap = p.vMax
+  for (const object of objects ?? []) {
+    if (object.pHuman < 0.5) continue
+    const dx = object.centroid.x - robot.x
+    const dy = object.centroid.y - robot.y
+    const distance = Math.hypot(dx, dy)
+    const bearing = normAngle(Math.atan2(dy, dx) - robot.theta)
+    if (Math.abs(bearing) > p.sensorFov / 2 || distance > p.dPref) continue
+    const risk = object.pHuman * Math.max(0, (p.dPref - distance) / Math.max(0.001, p.dPref - p.dMin))
+    cap = Math.min(cap, p.vMax * Math.max(0, 1 - risk))
+  }
+  return Math.max(0, cap)
+}
+
+function applyBeliefObjectVelocityCap(controls: ControlInput[], state: SimulationState, p: PlannerParameters) {
+  const cap = beliefObjectVelocityCap(state.robot, state.belief.objectBeliefs, p)
+  if (cap >= p.vMax) return controls
+  return controls.map((control) => ({ ...control, v: Math.min(control.v, cap) }))
+}
 
 function sampleControlSequence(
   state: SimulationState,
@@ -108,7 +136,11 @@ export function planSamplingMpc(args: {
       humans: args.state.humans,
       environment: args.state.environment,
       belief: args.state.belief,
-      controls: sampleControlSequence(args.state, args.parameters, rand, index),
+      controls: applyBeliefObjectVelocityCap(
+        sampleControlSequence(args.state, args.parameters, rand, index),
+        args.state,
+        args.parameters,
+      ),
       previousControl: args.state.previousControl,
       parameters: args.parameters,
     }),
