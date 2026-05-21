@@ -9,7 +9,7 @@ import type {
   PlannerParameters,
   RobotState,
 } from '../simulation/types'
-import { addCost, evaluateStageCost, terminalGoalCost } from './cost'
+import { addCost, evaluateStageCost, terminalBeliefGoalCost } from './cost'
 
 const zeroCost = () => ({
   terms: {
@@ -74,7 +74,7 @@ export function rolloutCandidate(args: {
     previousControl = control
   }
 
-  const goalTerminal = terminalGoalCost(robot, args.environment, args.parameters)
+  const goalTerminal = terminalBeliefGoalCost(robot, args.environment, belief, args.parameters)
   cost = {
     terms: { ...cost.terms, goalTerminal: cost.terms.goalTerminal + goalTerminal },
     total: cost.total + goalTerminal,

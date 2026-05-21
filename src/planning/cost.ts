@@ -12,6 +12,7 @@ import type {
   RobotState,
   WallSegment,
 } from '../simulation/types'
+import { expectedValueFieldCost } from './beliefValueExpectation'
 import { lookupValueField, valueFieldDescentHeading } from './valueField'
 
 const emptyTerms = () => ({
@@ -140,6 +141,17 @@ export function terminalGoalCost(
   const fieldCost = valueFieldCost(robot, environment)
   if (fieldCost !== null) return p.wGoalTerminal * fieldCost ** 2
   return p.wGoalTerminal * distance(robot, environment.goal) ** 2
+}
+
+export function terminalBeliefGoalCost(
+  robot: RobotState,
+  environment: Environment,
+  belief: BeliefState,
+  p: Pick<PlannerParameters, 'wGoalTerminal'>,
+) {
+  const expectedFieldCost = expectedValueFieldCost(environment, belief)
+  if (expectedFieldCost !== null) return p.wGoalTerminal * expectedFieldCost ** 2
+  return terminalGoalCost(robot, environment, p)
 }
 
 function valueFieldCost(robot: RobotState, environment: Environment) {
