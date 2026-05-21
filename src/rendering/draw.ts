@@ -62,6 +62,8 @@ export function drawScene(args: {
     ctx.stroke()
   }
 
+  drawValueField(ctx, args.environment, transform)
+
   drawSensorFov(ctx, args.robot, transform, args.sensorRadius, args.sensorFov)
 
   ctx.lineCap = 'round'
@@ -184,6 +186,36 @@ export function drawScene(args: {
     r.y - Math.sin(args.robot.theta) * 0.42 * transform.scale,
   )
   ctx.stroke()
+}
+
+function drawValueField(ctx: CanvasRenderingContext2D, environment: Environment, transform: Transform) {
+  const field = environment.valueField
+  if (!field) return
+  const reachable = field.values.filter((value) => Number.isFinite(value) && value < field.unreachableCost)
+  if (reachable.length === 0) return
+  const min = Math.min(...reachable)
+  const max = Math.max(...reachable)
+  const span = Math.max(1e-6, max - min)
+  const cellSize = field.resolution * transform.scale
+  for (let y = 0; y < field.height; y += 1) {
+    for (let x = 0; x < field.width; x += 1) {
+      const value = field.values[y * field.width + x]
+      if (!Number.isFinite(value) || value >= field.unreachableCost) continue
+      const normalized = 1 - (value - min) / span
+      const alpha = 0.05 + normalized * 0.2
+      const world = {
+        x: field.origin.x + x * field.resolution,
+        y: field.origin.y + y * field.resolution,
+      }
+      const canvas = worldToCanvas(world, transform)
+      ctx.fillStyle = `rgba(34, 211, 238, ${alpha.toFixed(3)})`
+      ctx.fillRect(canvas.x - cellSize / 2, canvas.y - cellSize / 2, cellSize, cellSize)
+    }
+  }
+
+  ctx.fillStyle = '#67e8f9'
+  ctx.font = '12px Inter, sans-serif'
+  ctx.fillText('value field cost-to-go', 32, 40)
 }
 
 function drawSensorFov(

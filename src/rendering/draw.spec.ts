@@ -67,6 +67,40 @@ describe('drawScene', () => {
     expect(calls).toContain('fillText:GOAL REACHED')
   })
 
+  it('draws a value-field diagnostic layer when the environment has a grid value field', () => {
+    const { ctx, calls } = createRecordingContext()
+
+    drawScene({
+      ctx,
+      width: 800,
+      height: 480,
+      environment: {
+        goal: { x: 0.4, y: 0.4 },
+        walls: [],
+        obstacles: [],
+        valueField: {
+          origin: { x: 0, y: 0 },
+          width: 2,
+          height: 2,
+          resolution: 0.5,
+          values: [3, 2, 2, 1],
+          unreachableCost: 1_000_000,
+        },
+      },
+      robot: { x: 0.25, y: 0.25, theta: 0 },
+      humans: [],
+      trace: [],
+      candidates: [],
+      dMin: 0.7,
+      dPref: 1.5,
+      sensorRadius: 2,
+      sensorFov: Math.PI / 2,
+    })
+
+    expect(calls).toContain('fillText:value field cost-to-go')
+    expect(calls.some((call) => call.startsWith('fillStyle:rgba(34, 211, 238'))).toBe(true)
+  })
+
   it('draws wall map confidence as a belief layer', () => {
     const { ctx, calls } = createRecordingContext()
 
