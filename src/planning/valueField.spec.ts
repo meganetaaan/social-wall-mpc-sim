@@ -119,4 +119,27 @@ describe('grid value field', () => {
 
     expect(second.valueField).toBe(first.valueField)
   })
+
+  it('filters short isolated feature fragments before using them as value-field walls', () => {
+    const segments = wallSegmentsFromEstimatedFeatures([
+      {
+        id: 'short-cross-corridor-fragment',
+        a: { x: 5.32, y: -0.14 },
+        b: { x: 5.49, y: 0.44 },
+        confidence: 0.58,
+        lastObservedAt: 6.7,
+        observationCount: 4,
+      },
+      {
+        id: 'supported-wall-feature',
+        a: { x: 4.2, y: 0.15 },
+        b: { x: 6.8, y: 0.15 },
+        confidence: 0.72,
+        lastObservedAt: 6.7,
+        observationCount: 5,
+      },
+    ])
+
+    expect(segments.map((segment) => segment.id)).toEqual(['supported-wall-feature'])
+  })
 })

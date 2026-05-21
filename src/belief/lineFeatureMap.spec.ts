@@ -66,4 +66,21 @@ describe('estimated line feature map', () => {
 
     expect(updated.map((feature) => feature.id)).toEqual(['feature-1', 'feature-2'])
   })
+
+  it('does not turn repeated lower-corridor wall observations into cross-corridor blockers', () => {
+    const observations = [
+      observation({ rayTarget: { x: 4.8, y: 0.15 }, sensorPose: { x: 4.7, y: 0.56, theta: 0 }, bearing: -1.33 }),
+      observation({ rayTarget: { x: 5.3, y: 0.15 }, sensorPose: { x: 5.2, y: 0.56, theta: 0 }, bearing: -1.33 }),
+      observation({ rayTarget: { x: 5.8, y: 0.15 }, sensorPose: { x: 5.7, y: 0.56, theta: 0 }, bearing: -1.33 }),
+    ]
+
+    const features = updateEstimatedLineFeatures({ existing: [], observations, time: 8 })
+
+    expect(features.length).toBeGreaterThan(0)
+    for (const feature of features) {
+      const dx = Math.abs(feature.b.x - feature.a.x)
+      const dy = Math.abs(feature.b.y - feature.a.y)
+      expect(dx).toBeGreaterThan(dy)
+    }
+  })
 })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { runScenarioBatch, runScenarioExperiment } from './experimentRunner'
 
-const fastParams = { sampleCount: 12, horizonSteps: 6 }
+const fastParams = { sampleCount: 12, horizonSteps: 6, wGoalTerminal: 80 }
 
 describe('headless experiment runner', () => {
   it('is deterministic for the same scenario, policy, parameters, and step bound', () => {
@@ -162,14 +162,14 @@ describe('headless experiment runner', () => {
     ).toBe(true)
   })
 
-  it('keeps the unknown spiral moving while the value field is still sparse', () => {
+  it('keeps the unknown spiral moving through the lower-right corridor while the value field is sparse', () => {
     const result = runScenarioExperiment({
       scenarioId: 'spiral-unknown',
       plannerMode: 'belief-mpc',
-      maxSteps: 80,
+      maxSteps: 160,
     })
 
     expect(result.finalState.metrics.stopDuration).toBeLessThan(1)
-    expect(result.finalState.robot.x).toBeGreaterThan(4)
-  }, 25_000)
+    expect(result.finalState.robot.x).toBeGreaterThan(7)
+  }, 60_000)
 })

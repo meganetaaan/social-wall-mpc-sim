@@ -43,14 +43,21 @@ export function environmentWithBeliefValueField(
   }
 }
 
+const MIN_VALUE_FIELD_FEATURE_LENGTH = 1.0
+
 export function wallSegmentsFromEstimatedFeatures(features: EstimatedLineFeature[]): WallSegment[] {
   return features
     .filter((feature) => feature.confidence > 0)
+    .filter((feature) => featureLength(feature) >= MIN_VALUE_FIELD_FEATURE_LENGTH)
     .map((feature) => ({
       id: feature.id,
       a: feature.a,
       b: feature.b,
     }))
+}
+
+function featureLength(feature: EstimatedLineFeature) {
+  return Math.hypot(feature.b.x - feature.a.x, feature.b.y - feature.a.y)
 }
 
 export function observedWallSegments(environment: Environment, estimatedWalls: EstimatedWallSegment[]): WallSegment[] {

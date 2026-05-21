@@ -143,6 +143,7 @@ export function goalProgressCost(
     const motionAlongDescent = control.v * Math.cos(normAngle(robot.theta - descent.heading))
     return -p.wGoalProgress * valueFieldReliability(environment) ** 2 * motionAlongDescent * Math.min(2, descent.slope)
   }
+  if (field && crossesAnyWall(robot, environment.goal, environment.walls)) return 0
   const goalHeading = Math.atan2(environment.goal.y - robot.y, environment.goal.x - robot.x)
   return -p.wGoalProgress * control.v * Math.cos(normAngle(robot.theta - goalHeading))
 }
@@ -167,7 +168,8 @@ export function terminalBeliefGoalCost(
   const expectedFieldCost = expectedValueFieldCost(environment, belief)
   if (expectedFieldCost !== null && valueFieldReliability(environment) >= MIN_RELIABLE_VALUE_FIELD)
     return p.wGoalTerminal * valueFieldReliability(environment) ** 2 * expectedFieldCost ** 2
-  return 0
+  if (environment.valueField && crossesAnyWall(belief.pose.mean, environment.goal, environment.walls)) return 0
+  return p.wGoalTerminal * distance(belief.pose.mean, environment.goal) ** 2
 }
 
 function valueFieldCost(robot: RobotState, environment: Environment) {
@@ -176,9 +178,31 @@ function valueFieldCost(robot: RobotState, environment: Environment) {
   return lookupValueField(field, robot)
 }
 
+function crossesAnyWall(a: RobotState, b: { x: number; y: number }, walls: WallSegment[]) {
+  return walls.some((wall) => segmentsIntersect(a, b, wall.a, wall.b))
+}
+
+function segmentsIntersect(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  c: { x: number; y: number },
+  d: { x: number; y: number },
+) {
+  const o1 = orientation(a, b, c)
+  const o2 = orientation(a, b, d)
+  const o3 = orientation(c, d, a)
+  const o4 = orientation(c, d, b)
+  return o1 * o2 < 0 && o3 * o4 < 0
+}
+
+function orientation(a: { x: number; y: number }, b: { x: number; y: number }, c: { x: number; y: number }) {
+  return Math.sign((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x))
+}
+
 export function valueFieldReliability(environment: Environment) {
   const field = environment.valueField
-  if (!field || field.sourceWallLength === undefined) return 1
+  if (!field) return 0
+  if (field.sourceWallLength === undefined) return 1
   const fullWallLength = environment.walls.reduce(
     (total, wall) => total + Math.hypot(wall.b.x - wall.a.x, wall.b.y - wall.a.y),
     0,
