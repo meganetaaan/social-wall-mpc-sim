@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultSimulationState, defaultParameters } from '../simulation/environment'
+import { createSimulationStateForScenario } from '../simulation/scenarios'
 import { planSamplingMpc } from './samplingMpc'
 
 describe('sampling MPC planner', () => {
@@ -52,5 +53,22 @@ describe('sampling MPC planner', () => {
     })
 
     expect(result.bestControl.v).toBeLessThan(0.08)
+  })
+
+  it('keeps moving along a spiral value field instead of stalling on an early plateau', () => {
+    const state = createSimulationStateForScenario('spiral-known')
+    const earlyPlateau = {
+      ...state,
+      robot: { x: 1.7, y: 0.7, theta: 0 },
+      previousControl: { v: 0, omega: 0 },
+    }
+
+    const result = planSamplingMpc({
+      state: earlyPlateau,
+      parameters: { ...defaultParameters, sampleCount: 90, horizonSteps: 13 },
+      seed: 500,
+    })
+
+    expect(result.bestControl.v).toBeGreaterThan(0.08)
   })
 })

@@ -83,6 +83,42 @@ export function lookupValueField(field: GridValueField, point: Vec2): number {
   return field.values[toIndex(field, x, y)]
 }
 
+export function valueFieldDescentHeading(
+  field: GridValueField,
+  point: Vec2,
+  options: { searchRadiusCells?: number } = {},
+): { heading: number; slope: number; value: number } | null {
+  const cx = Math.round((point.x - field.origin.x) / field.resolution)
+  const cy = Math.round((point.y - field.origin.y) / field.resolution)
+  if (cx < 0 || cy < 0 || cx >= field.width || cy >= field.height) return null
+  const here = field.values[toIndex(field, cx, cy)]
+  if (!Number.isFinite(here) || here >= field.unreachableCost) return null
+  const searchRadius = options.searchRadiusCells ?? 3
+  let best: { x: number; y: number; value: number; distanceCells: number } | null = null
+  for (let dy = -searchRadius; dy <= searchRadius; dy += 1) {
+    for (let dx = -searchRadius; dx <= searchRadius; dx += 1) {
+      if (dx === 0 && dy === 0) continue
+      const x = cx + dx
+      const y = cy + dy
+      if (x < 0 || y < 0 || x >= field.width || y >= field.height) continue
+      const value = field.values[toIndex(field, x, y)]
+      if (!Number.isFinite(value) || value >= here) continue
+      const distanceCells = Math.hypot(dx, dy)
+      if (!best || value < best.value || (value === best.value && distanceCells < best.distanceCells)) {
+        best = { x, y, value, distanceCells }
+      }
+    }
+  }
+  if (!best) return null
+  const target = cellCenter(field, best.x, best.y)
+  const travelDistance = Math.max(field.resolution, distance(point, target))
+  return {
+    heading: Math.atan2(target.y - point.y, target.x - point.x),
+    slope: (here - best.value) / travelDistance,
+    value: here,
+  }
+}
+
 function nearestFreeCell(
   field: GridValueField,
   point: Vec2,

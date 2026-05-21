@@ -2,6 +2,7 @@ import { clampControl, stepRobot } from '../simulation/dynamics'
 import { mulberry32, nearestWall, normAngle, wallTangentAngle } from '../simulation/math'
 import type { ControlInput, PlannerParameters, PlanningResult, SimulationState } from '../simulation/types'
 import { rolloutCandidate } from './rollout'
+import { valueFieldDescentHeading } from './valueField'
 
 function sampleControlSequence(
   state: SimulationState,
@@ -13,6 +14,7 @@ function sampleControlSequence(
   const headingError = normAngle(wallTangentAngle(nearest.wall) - state.robot.theta)
   if (index === 3) return guideSequence(state, p, 'goal')
   if (index === 4) return guideSequence(state, p, 'blend')
+  if (index === 5 && state.environment.valueField) return guideValueFieldSequence(state, p)
   const templates: ControlInput[] = [
     { v: 0, omega: 0 },
     { v: 0.18, omega: headingError * 0.8 },
@@ -56,6 +58,32 @@ function guideSequence(state: SimulationState, p: PlannerParameters, kind: 'goal
       {
         v: previous.v * 0.35 + (kind === 'goal' ? 0.68 : 0.56) * 0.65,
         omega: previous.omega * 0.2 + headingError * (kind === 'goal' ? 1.3 : 1.05),
+      },
+      p,
+    )
+    controls.push(control)
+    robot = stepRobot(robot, control, p.dt)
+    previous = control
+  }
+  return controls
+}
+
+function guideValueFieldSequence(state: SimulationState, p: PlannerParameters): ControlInput[] {
+  const controls: ControlInput[] = []
+  const field = state.environment.valueField
+  let robot = state.robot
+  let previous = state.previousControl
+  const horizonSteps = Math.max(1, Math.floor(p.horizonSteps))
+  for (let k = 0; k < horizonSteps; k += 1) {
+    const descent = field ? valueFieldDescentHeading(field, robot) : null
+    const nearest = nearestWall({ x: robot.x, y: robot.y }, state.environment.walls)
+    const wallHeading = wallTangentAngle(nearest.wall)
+    const targetHeading = descent?.heading ?? wallHeading
+    const headingError = normAngle(targetHeading - robot.theta)
+    const control = clampControl(
+      {
+        v: previous.v * 0.2 + 0.48,
+        omega: previous.omega * 0.15 + headingError * 1.25,
       },
       p,
     )

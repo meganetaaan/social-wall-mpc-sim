@@ -11,6 +11,7 @@ import type {
   RobotState,
   WallSegment,
 } from '../simulation/types'
+import { lookupValueField, valueFieldDescentHeading } from './valueField'
 
 const emptyTerms = () => ({
   wall: 0,
@@ -105,10 +106,11 @@ export function goalProgressCost(
   environment: Environment,
   p: Pick<PlannerParameters, 'wGoalProgress'>,
 ) {
-  const valueGradient = localValueGradient(robot, environment)
-  if (valueGradient) {
-    const motionAlongDescent = control.v * Math.cos(normAngle(robot.theta - valueGradient.descentHeading))
-    return -p.wGoalProgress * motionAlongDescent * Math.min(2, valueGradient.slope)
+  const field = environment.valueField
+  const descent = field ? valueFieldDescentHeading(field, robot) : null
+  if (descent) {
+    const motionAlongDescent = control.v * Math.cos(normAngle(robot.theta - descent.heading))
+    return -p.wGoalProgress * motionAlongDescent * Math.min(2, descent.slope)
   }
   const goalHeading = Math.atan2(environment.goal.y - robot.y, environment.goal.x - robot.x)
   return -p.wGoalProgress * control.v * Math.cos(normAngle(robot.theta - goalHeading))
@@ -120,35 +122,14 @@ export function terminalGoalCost(
   p: Pick<PlannerParameters, 'wGoalTerminal'>,
 ) {
   const fieldCost = valueFieldCost(robot, environment)
-  if (fieldCost !== null) return p.wGoalTerminal * fieldCost
+  if (fieldCost !== null) return p.wGoalTerminal * fieldCost ** 2
   return p.wGoalTerminal * distance(robot, environment.goal) ** 2
 }
 
 function valueFieldCost(robot: RobotState, environment: Environment) {
   const field = environment.valueField
   if (!field) return null
-  const x = Math.round((robot.x - field.origin.x) / field.resolution)
-  const y = Math.round((robot.y - field.origin.y) / field.resolution)
-  if (x < 0 || y < 0 || x >= field.width || y >= field.height) return field.unreachableCost
-  return field.values[y * field.width + x]
-}
-
-function localValueGradient(robot: RobotState, environment: Environment) {
-  const field = environment.valueField
-  if (!field) return null
-  const here = valueFieldCost(robot, environment)
-  if (here === null || !Number.isFinite(here) || here >= field.unreachableCost) return null
-  const step = field.resolution
-  const sample = (x: number, y: number) => valueFieldCost({ x, y, theta: robot.theta }, environment) ?? here
-  const right = sample(robot.x + step, robot.y)
-  const left = sample(robot.x - step, robot.y)
-  const up = sample(robot.x, robot.y + step)
-  const down = sample(robot.x, robot.y - step)
-  const dx = (right - left) / (2 * step)
-  const dy = (up - down) / (2 * step)
-  const slope = Math.hypot(dx, dy)
-  if (!Number.isFinite(slope) || slope < 1e-6) return null
-  return { descentHeading: Math.atan2(-dy, -dx), slope }
+  return lookupValueField(field, robot)
 }
 
 export function expectedObservationGain(
