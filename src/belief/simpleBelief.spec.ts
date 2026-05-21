@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { defaultParameters } from '../simulation/environment'
-import type { BeliefState, Environment, RobotState } from '../simulation/types'
+import type { BeliefState, Environment, RobotState, WallObservation } from '../simulation/types'
+import { updateEstimatedLineFeatures } from './lineFeatureMap'
 import { poseGaussianFromSigmas } from './poseBelief'
 import { mapUncertaintyTrace, traceSigma, updateBelief } from './simpleBelief'
 
@@ -52,6 +53,51 @@ describe('map belief update', () => {
     expect(updated.sigmaX).toBe(updated.pose.covariance[0][0])
     expect(updated.sigmaY).toBe(updated.pose.covariance[1][1])
     expect(updated.sigmaTheta).toBe(updated.pose.covariance[2][2])
+  })
+
+  it('keeps true-id wall coverage as the default map update mode', () => {
+    const robot: RobotState = { x: 1, y: 0.45, theta: -Math.PI / 2 }
+
+    const updated = updateBelief(initialBelief, robot, environment, defaultParameters, 12)
+
+    expect(updated.estimatedWalls.find((wall) => wall.wallId === 'observed-wall')?.tMax).toBeGreaterThan(0)
+    expect(updated.estimatedFeatures ?? []).toHaveLength(0)
+  })
+
+  it('updates anonymous estimated line features in opt-in map update mode', () => {
+    const robot: RobotState = { x: 1, y: 0.45, theta: -Math.PI / 2 }
+
+    const updated = updateBelief(initialBelief, robot, environment, defaultParameters, 12, [], {
+      mapUpdateMode: 'anonymous-line-features',
+    })
+
+    expect(updated.estimatedWalls).toEqual(initialBelief.estimatedWalls)
+    expect(updated.estimatedFeatures?.[0]?.id).toMatch(/^feature-/)
+    expect(Object.keys(updated.estimatedFeatures?.[0] ?? {})).not.toContain('wallId')
+  })
+
+  it('reuses anonymous estimated line features across matching updates', () => {
+    const first: WallObservation = {
+      wallId: 'true-wall-a',
+      tMin: 0.2,
+      tMax: 0.4,
+      confidence: 0.7,
+      strength: 0.6,
+      range: 1,
+      bearing: 0,
+      rangeStdDev: 0.03,
+      bearingStdDev: 0.01,
+      rayTarget: { x: 1, y: 0 },
+      sensorPose: { x: 1, y: 1, theta: -Math.PI / 2 },
+    }
+    const second = { ...first, wallId: 'different-true-wall', rayTarget: { x: 1.02, y: 0.01 } }
+
+    const created = updateEstimatedLineFeatures({ existing: [], observations: [first], time: 1 })
+    const reused = updateEstimatedLineFeatures({ existing: created, observations: [second], time: 2 })
+
+    expect(reused).toHaveLength(1)
+    expect(reused[0].id).toBe(created[0].id)
+    expect(reused[0].observationCount).toBe(2)
   })
 
   it('traces pose covariance before legacy scalar fields', () => {

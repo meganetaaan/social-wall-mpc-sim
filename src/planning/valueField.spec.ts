@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { poseGaussianFromSigmas } from '../belief/poseBelief'
 import { createSimulationStateForScenario } from '../simulation/scenarios'
-import type { Environment, RobotState } from '../simulation/types'
+import type { BeliefState, Environment, RobotState } from '../simulation/types'
+import { environmentWithBeliefValueField, wallSegmentsFromEstimatedFeatures } from './beliefValueField'
 import { createGridValueField, lookupValueField } from './valueField'
 
 const simpleWallEnvironment: Environment = {
@@ -41,6 +43,65 @@ describe('grid value field', () => {
     if (!unknownField || !knownField) throw new Error('spiral value fields should be defined')
     expect(lookupValueField(unknownField, wallSeparatedPoint)).toBeLessThan(
       lookupValueField(knownField, wallSeparatedPoint),
+    )
+  })
+
+  it('converts estimated local line features into planner wall segments without true ids', () => {
+    const segments = wallSegmentsFromEstimatedFeatures([
+      {
+        id: 'feature-1',
+        a: { x: 0, y: 1 },
+        b: { x: 3, y: 1 },
+        confidence: 0.8,
+        lastObservedAt: 4,
+        observationCount: 1,
+      },
+    ])
+
+    expect(segments).toEqual([{ id: 'feature-1', a: { x: 0, y: 1 }, b: { x: 3, y: 1 } }])
+  })
+
+  it('builds unknown-map value fields from local estimated features before true-id estimated walls', () => {
+    const environment: Environment = {
+      goal: { x: 2, y: 2 },
+      goalRadius: 0.2,
+      walls: [{ id: 'true-hidden-wall', a: { x: 0, y: 1 }, b: { x: 4, y: 1 } }],
+      obstacles: [],
+      valueField: createGridValueField(
+        { goal: { x: 2, y: 2 }, walls: [], obstacles: [] },
+        { resolution: 0.25, robotRadius: 0.05 },
+      ),
+    }
+    const belief: BeliefState = {
+      pose: poseGaussianFromSigmas({ x: 2, y: 0.5, theta: 0 }, 0.1, 0.1, 0.05),
+      sigmaX: 0.1,
+      sigmaY: 0.1,
+      sigmaTheta: 0.05,
+      mapConfidence: 0.1,
+      wallBeliefs: [],
+      estimatedWalls: [],
+      estimatedFeatures: [
+        {
+          id: 'feature-1',
+          a: { x: 0, y: 1 },
+          b: { x: 4, y: 1 },
+          confidence: 0.9,
+          lastObservedAt: 1,
+          observationCount: 1,
+        },
+      ],
+    }
+
+    const options = { resolution: 0.25, robotRadius: 0.05, padding: 2 }
+    const withoutFeature = environmentWithBeliefValueField(environment, { ...belief, estimatedFeatures: [] }, options)
+    const withFeature = environmentWithBeliefValueField(environment, belief, options)
+
+    expect(wallSegmentsFromEstimatedFeatures(belief.estimatedFeatures ?? []).map((wall) => wall.id)).toEqual([
+      'feature-1',
+    ])
+    if (!withFeature.valueField || !withoutFeature.valueField) throw new Error('value fields should be defined')
+    expect(lookupValueField(withFeature.valueField, { x: 2, y: 0.5 })).toBeGreaterThan(
+      lookupValueField(withoutFeature.valueField, { x: 2, y: 0.5 }),
     )
   })
 })

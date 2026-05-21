@@ -2,12 +2,14 @@ import { nearestWall, normAngle } from '../simulation/math'
 import type {
   BeliefState,
   Environment,
+  MapUpdateMode,
   PlannerParameters,
   PointObservation,
   PoseGaussian,
   RobotState,
   WallBelief,
 } from '../simulation/types'
+import { updateEstimatedLineFeatures } from './lineFeatureMap'
 import { updateObjectBeliefs } from './pointObjectBelief'
 import {
   correctPoseGaussianWithObservation,
@@ -52,6 +54,7 @@ export function updateBelief(
   parameters: PlannerParameters,
   time = 0,
   pointObservations: PointObservation[] = [],
+  options: { mapUpdateMode?: MapUpdateMode } = {},
 ): BeliefState {
   const nearest = nearestWall({ x: robot.x, y: robot.y }, environment.walls)
   const observationStrength = Math.max(0, 1 - nearest.distance / 2.2)
@@ -63,12 +66,15 @@ export function updateBelief(
   )
   const sigmas = sigmasFromPoseGaussian(correctedPose)
   const observations = observeWalls(robot, environment, parameters)
-  const estimatedWalls = updateEstimatedWallBelief(
-    initializeEstimatedWallBelief(environment, belief),
-    environment,
-    observations,
-    time,
-  )
+  const mapUpdateMode = options.mapUpdateMode ?? 'true-id-coverage'
+  const estimatedWalls =
+    mapUpdateMode === 'true-id-coverage'
+      ? updateEstimatedWallBelief(initializeEstimatedWallBelief(environment, belief), environment, observations, time)
+      : belief.estimatedWalls
+  const estimatedFeatures =
+    mapUpdateMode === 'anonymous-line-features'
+      ? updateEstimatedLineFeatures({ existing: belief.estimatedFeatures ?? [], observations, time })
+      : belief.estimatedFeatures
   const wallBeliefs = completeWallBeliefs(belief, environment).map((wallBelief) => {
     const wall = environment.walls.find((candidate) => candidate.id === wallBelief.wallId)
     if (!wall) return wallBelief
@@ -89,6 +95,7 @@ export function updateBelief(
     mapConfidence,
     wallBeliefs,
     estimatedWalls,
+    estimatedFeatures,
     objectBeliefs,
   }
 }

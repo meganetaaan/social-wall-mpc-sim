@@ -29,6 +29,15 @@ export type EstimatedWallSegment = {
   confidence: number
   lastObservedAt: number
 }
+export type EstimatedLineFeature = {
+  id: string
+  a: Vec2
+  b: Vec2
+  confidence: number
+  lastObservedAt: number
+  observationCount: number
+}
+export type MapUpdateMode = 'true-id-coverage' | 'anonymous-line-features'
 export type WallObservation = {
   wallId: string
   tMin: number
@@ -86,6 +95,7 @@ export type BeliefState = {
   mapConfidence: number
   wallBeliefs: WallBelief[]
   estimatedWalls: EstimatedWallSegment[]
+  estimatedFeatures?: EstimatedLineFeature[]
   objectBeliefs?: ObjectBelief[]
 }
 export type CostTerms = {

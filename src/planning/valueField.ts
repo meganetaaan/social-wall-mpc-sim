@@ -143,7 +143,7 @@ function nearestFreeCell(
 }
 
 function isBlocked(point: Vec2, environment: Environment, robotRadius: number) {
-  if (nearestWall(point, environment.walls).distance < robotRadius) return true
+  if (environment.walls.length > 0 && nearestWall(point, environment.walls).distance < robotRadius) return true
   return environment.obstacles.some((obstacle) => distance(point, obstacle) <= obstacle.radius + robotRadius)
 }
 

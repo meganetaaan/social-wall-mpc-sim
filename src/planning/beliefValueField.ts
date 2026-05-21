@@ -1,17 +1,36 @@
-import type { BeliefState, Environment, EstimatedWallSegment, WallSegment } from '../simulation/types'
+import type {
+  BeliefState,
+  Environment,
+  EstimatedLineFeature,
+  EstimatedWallSegment,
+  WallSegment,
+} from '../simulation/types'
 import { createGridValueField, type GridValueFieldOptions } from './valueField'
 
 export const spiralValueFieldOptions: GridValueFieldOptions = { resolution: 0.2, robotRadius: 0.22 }
 
 export function environmentWithBeliefValueField(
   environment: Environment,
-  belief: Pick<BeliefState, 'estimatedWalls'>,
+  belief: Pick<BeliefState, 'estimatedWalls' | 'estimatedFeatures'>,
   options: GridValueFieldOptions = spiralValueFieldOptions,
 ): Environment {
   if (!environment.valueField) return environment
-  const observedWalls = observedWallSegments(environment, belief.estimatedWalls)
+  const observedWalls =
+    belief.estimatedFeatures && belief.estimatedFeatures.length > 0
+      ? wallSegmentsFromEstimatedFeatures(belief.estimatedFeatures)
+      : observedWallSegments(environment, belief.estimatedWalls)
   const fieldEnvironment = { ...environment, walls: observedWalls }
   return { ...environment, valueField: createGridValueField(fieldEnvironment, options) }
+}
+
+export function wallSegmentsFromEstimatedFeatures(features: EstimatedLineFeature[]): WallSegment[] {
+  return features
+    .filter((feature) => feature.confidence > 0)
+    .map((feature) => ({
+      id: feature.id,
+      a: feature.a,
+      b: feature.b,
+    }))
 }
 
 export function observedWallSegments(environment: Environment, estimatedWalls: EstimatedWallSegment[]): WallSegment[] {
