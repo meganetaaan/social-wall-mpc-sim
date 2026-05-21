@@ -1,5 +1,5 @@
+import { transitionBelief } from '../belief/beliefTransition'
 import { observePointReturns } from '../belief/pointObjectBelief'
-import { updateBelief } from '../belief/simpleBelief'
 import { observeWalls } from '../belief/wallMapBelief'
 import { environmentWithBeliefValueField } from '../planning/beliefValueField'
 import { planWithPolicy } from '../planning/policies'
@@ -23,14 +23,15 @@ export function stepSimulation(
     parameters,
     time: state.time + parameters.dt,
   })
-  const belief = updateBelief(
-    state.belief,
-    robot,
-    state.environment,
+  const belief = transitionBelief({
+    belief: state.belief,
+    control: plan.bestControl,
+    observedRobot: robot,
+    environment: state.environment,
     parameters,
-    state.time + parameters.dt,
-    currentPointObservations,
-  )
+    time: state.time + parameters.dt,
+    pointObservations: currentPointObservations,
+  })
   const environment = environmentWithBeliefValueField(state.environment, belief)
   const currentObservations = observeWalls(robot, environment, parameters)
   const trace = [...state.trace, { x: robot.x, y: robot.y }].slice(-650)

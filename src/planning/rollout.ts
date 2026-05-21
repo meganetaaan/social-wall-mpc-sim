@@ -1,4 +1,4 @@
-import { updateBelief } from '../belief/simpleBelief'
+import { transitionBelief } from '../belief/beliefTransition'
 import { predictHumans, stepRobot } from '../simulation/dynamics'
 import type {
   BeliefState,
@@ -62,7 +62,13 @@ export function rolloutCandidate(args: {
     robot = stepRobot(robot, control, args.parameters.dt)
     humans = predictHumans(humans, args.parameters.dt, undefined, robot, rolloutTime)
     rolloutTime += args.parameters.dt
-    belief = updateBelief(belief, robot, args.environment, args.parameters)
+    belief = transitionBelief({
+      belief,
+      control,
+      observedRobot: robot,
+      environment: args.environment,
+      parameters: args.parameters,
+    })
     trajectory.push(robot)
     predictedHumans.push(humans)
     previousControl = control
