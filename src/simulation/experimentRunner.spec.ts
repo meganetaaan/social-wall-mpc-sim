@@ -161,4 +161,15 @@ describe('headless experiment runner', () => {
         beliefMpc.bestGoalDistance < wallOnly.bestGoalDistance,
     ).toBe(true)
   })
+
+  it('keeps the unknown spiral moving while the value field is still sparse', () => {
+    const result = runScenarioExperiment({
+      scenarioId: 'spiral-unknown',
+      plannerMode: 'belief-mpc',
+      maxSteps: 80,
+    })
+
+    expect(result.finalState.metrics.stopDuration).toBeLessThan(1)
+    expect(result.finalState.robot.x).toBeGreaterThan(4)
+  }, 25_000)
 })

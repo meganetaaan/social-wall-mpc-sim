@@ -8,6 +8,7 @@ import type {
   RobotState,
   SimulationState,
 } from '../simulation/types'
+import { valueFieldReliability } from './cost'
 import { rolloutCandidate } from './rollout'
 import { valueFieldDescentHeading } from './valueField'
 
@@ -42,7 +43,8 @@ function sampleControlSequence(
   const headingError = normAngle(wallTangentAngle(nearest.wall) - state.robot.theta)
   if (index === 3) return guideSequence(state, p, 'goal')
   if (index === 4) return guideSequence(state, p, 'blend')
-  if (index === 5 && state.environment.valueField) return guideValueFieldSequence(state, p)
+  if (index === 5 && state.environment.valueField && valueFieldReliability(state.environment) > 0.35)
+    return guideValueFieldSequence(state, p)
   const templates: ControlInput[] = [
     { v: 0, omega: 0 },
     { v: -0.18, omega: 0 },

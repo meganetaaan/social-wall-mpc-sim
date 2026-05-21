@@ -9,6 +9,8 @@ import { createGridValueField, type GridValueFieldOptions } from './valueField'
 
 export const spiralValueFieldOptions: GridValueFieldOptions = { resolution: 0.2, robotRadius: 0.22 }
 
+const MIN_VALUE_FIELD_WALL_LENGTH_DELTA = 1.2
+
 export function environmentWithBeliefValueField(
   environment: Environment,
   belief: Pick<BeliefState, 'estimatedWalls' | 'estimatedFeatures'>,
@@ -19,8 +21,26 @@ export function environmentWithBeliefValueField(
     belief.estimatedFeatures && belief.estimatedFeatures.length > 0
       ? wallSegmentsFromEstimatedFeatures(belief.estimatedFeatures)
       : observedWallSegments(environment, belief.estimatedWalls)
+  const sourceKey = valueFieldSourceKey(observedWalls, options)
+  const sourceWallLength = totalWallLength(observedWalls)
+  if (environment.valueField.sourceKey === sourceKey) return environment
+  if (
+    environment.valueField.sourceWallLength !== undefined &&
+    sourceWallLength < environment.valueField.sourceWallLength * 0.98
+  ) {
+    return environment
+  }
+  if (
+    environment.valueField.sourceWallLength !== undefined &&
+    Math.abs(sourceWallLength - environment.valueField.sourceWallLength) < MIN_VALUE_FIELD_WALL_LENGTH_DELTA
+  ) {
+    return environment
+  }
   const fieldEnvironment = { ...environment, walls: observedWalls }
-  return { ...environment, valueField: createGridValueField(fieldEnvironment, options) }
+  return {
+    ...environment,
+    valueField: { ...createGridValueField(fieldEnvironment, options), sourceKey, sourceWallLength },
+  }
 }
 
 export function wallSegmentsFromEstimatedFeatures(features: EstimatedLineFeature[]): WallSegment[] {
@@ -50,6 +70,22 @@ export function observedWallSegments(environment: Environment, estimatedWalls: E
       },
     ]
   })
+}
+
+function valueFieldSourceKey(walls: WallSegment[], options: GridValueFieldOptions) {
+  const wallKey = walls
+    .map((wall) => `${wall.id}:${rounded(wall.a.x)},${rounded(wall.a.y)}-${rounded(wall.b.x)},${rounded(wall.b.y)}`)
+    .sort()
+    .join('|')
+  return `r=${options.resolution};rr=${options.robotRadius};p=${options.padding ?? ''};walls=${wallKey}`
+}
+
+function totalWallLength(walls: WallSegment[]) {
+  return walls.reduce((total, wall) => total + Math.hypot(wall.b.x - wall.a.x, wall.b.y - wall.a.y), 0)
+}
+
+function rounded(value: number) {
+  return Math.round(value * 1000) / 1000
 }
 
 function segmentPoint(wall: WallSegment, t: number) {

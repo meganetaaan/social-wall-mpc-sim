@@ -31,6 +31,8 @@ const emptyTerms = () => ({
   wallBeliefConsistency: 0,
 })
 
+const MIN_RELIABLE_VALUE_FIELD = 0.35
+
 export function wallFollowingCost(robot: RobotState, wall: WallSegment, p: PlannerParameters) {
   const point = { x: robot.x, y: robot.y }
   const dWall = nearestWall(point, [wall]).distance
@@ -137,9 +139,9 @@ export function goalProgressCost(
 ) {
   const field = environment.valueField
   const descent = field ? valueFieldDescentHeading(field, robot) : null
-  if (descent) {
+  if (descent && valueFieldReliability(environment) >= MIN_RELIABLE_VALUE_FIELD) {
     const motionAlongDescent = control.v * Math.cos(normAngle(robot.theta - descent.heading))
-    return -p.wGoalProgress * motionAlongDescent * Math.min(2, descent.slope)
+    return -p.wGoalProgress * valueFieldReliability(environment) ** 2 * motionAlongDescent * Math.min(2, descent.slope)
   }
   const goalHeading = Math.atan2(environment.goal.y - robot.y, environment.goal.x - robot.x)
   return -p.wGoalProgress * control.v * Math.cos(normAngle(robot.theta - goalHeading))
@@ -151,25 +153,38 @@ export function terminalGoalCost(
   p: Pick<PlannerParameters, 'wGoalTerminal'>,
 ) {
   const fieldCost = valueFieldCost(robot, environment)
-  if (fieldCost !== null) return p.wGoalTerminal * fieldCost ** 2
+  if (fieldCost !== null && valueFieldReliability(environment) >= MIN_RELIABLE_VALUE_FIELD)
+    return p.wGoalTerminal * valueFieldReliability(environment) ** 2 * fieldCost ** 2
   return p.wGoalTerminal * distance(robot, environment.goal) ** 2
 }
 
 export function terminalBeliefGoalCost(
-  robot: RobotState,
+  _robot: RobotState,
   environment: Environment,
   belief: BeliefState,
   p: Pick<PlannerParameters, 'wGoalTerminal'>,
 ) {
   const expectedFieldCost = expectedValueFieldCost(environment, belief)
-  if (expectedFieldCost !== null) return p.wGoalTerminal * expectedFieldCost ** 2
-  return terminalGoalCost(robot, environment, p)
+  if (expectedFieldCost !== null && valueFieldReliability(environment) >= MIN_RELIABLE_VALUE_FIELD)
+    return p.wGoalTerminal * valueFieldReliability(environment) ** 2 * expectedFieldCost ** 2
+  return 0
 }
 
 function valueFieldCost(robot: RobotState, environment: Environment) {
   const field = environment.valueField
   if (!field) return null
   return lookupValueField(field, robot)
+}
+
+export function valueFieldReliability(environment: Environment) {
+  const field = environment.valueField
+  if (!field || field.sourceWallLength === undefined) return 1
+  const fullWallLength = environment.walls.reduce(
+    (total, wall) => total + Math.hypot(wall.b.x - wall.a.x, wall.b.y - wall.a.y),
+    0,
+  )
+  if (fullWallLength <= 0) return 1
+  return Math.max(0, Math.min(1, field.sourceWallLength / fullWallLength))
 }
 
 export function expectedObservationGain(

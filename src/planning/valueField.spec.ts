@@ -104,4 +104,19 @@ describe('grid value field', () => {
       lookupValueField(withoutFeature.valueField, { x: 2, y: 0.5 }),
     )
   })
+
+  it('keeps known-map spiral value fields constrained by the full map instead of degrading to observed fragments', () => {
+    const state = createSimulationStateForScenario('spiral-known')
+    const refreshed = environmentWithBeliefValueField(state.environment, state.belief)
+
+    expect(refreshed.valueField).toBe(state.environment.valueField)
+  })
+
+  it('reuses a belief-derived value field when the estimated feature map has not changed', () => {
+    const firstState = createSimulationStateForScenario('crossing-human')
+    const first = environmentWithBeliefValueField(firstState.environment, firstState.belief)
+    const second = environmentWithBeliefValueField(first, firstState.belief)
+
+    expect(second.valueField).toBe(first.valueField)
+  })
 })

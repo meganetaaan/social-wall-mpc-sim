@@ -79,6 +79,8 @@ export type GridValueField = {
   resolution: number
   values: number[]
   unreachableCost: number
+  sourceKey?: string
+  sourceWallLength?: number
 }
 export type Environment = {
   walls: WallSegment[]
