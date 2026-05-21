@@ -1,5 +1,5 @@
 import { tracePoseCovariance } from '../belief/poseBelief'
-import { wallAssociationAccuracy } from '../belief/wallMapBelief'
+import { wallAssociationAccuracy } from '../belief/wallAssociation'
 import { goalDistance, goalRadius, isGoalReached } from './goal'
 import { clamp, distance, length, nearestWall, normAngle, sub, wallTangentAngle } from './math'
 import type {

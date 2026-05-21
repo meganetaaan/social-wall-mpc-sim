@@ -67,6 +67,7 @@ export function ExperimentSummaryPanel({ parameters }: Props) {
                 <th>Min human dist</th>
                 <th>Social violations</th>
                 <th>Near collisions</th>
+                <th>Wall assoc acc</th>
                 <th>Stop duration</th>
               </tr>
             </thead>
@@ -93,6 +94,7 @@ function SummaryRow({ summary }: { summary: ScenarioExperimentSummary }) {
       <td>{summary.minHumanDistance.toFixed(2)}m</td>
       <td>{summary.socialViolationCount}</td>
       <td>{summary.nearCollisionCount}</td>
+      <td>{summary.wallAssociationAccuracy.toFixed(2)}</td>
       <td>{summary.stopDuration.toFixed(1)}s</td>
     </tr>
   )

@@ -8,12 +8,13 @@ import type {
   RobotState,
   Vec2,
 } from '../simulation/types'
+import { toPlannerPointObservation } from './observations'
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value))
 const TRACK_ASSOCIATION_DISTANCE = 0.75
 
 function pointObservation(id: string, robot: RobotState, point: Vec2, time: number): PointObservation {
-  return {
+  return toPlannerPointObservation({
     id,
     point: { ...point },
     range: distance(robot, point),
@@ -21,7 +22,7 @@ function pointObservation(id: string, robot: RobotState, point: Vec2, time: numb
     sensorPose: { ...robot },
     time,
     source: 'point-sensor',
-  }
+  })
 }
 
 function isVisible(robot: RobotState, point: Vec2, parameters: PlannerParameters) {

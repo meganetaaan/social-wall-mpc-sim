@@ -219,6 +219,14 @@ describe('simulation metrics', () => {
     expect(metrics.wallAssociationAccuracy).toBeLessThanOrEqual(1)
   })
 
+  it('treats no wall observations as perfect association accuracy because no wrong associations were observed', () => {
+    const state = createSimulationStateForScenario('crossing-human')
+
+    const metrics = createInitialMetrics({ ...state, currentObservations: [] }, defaultParameters)
+
+    expect(metrics.wallAssociationAccuracy).toBe(1)
+  })
+
   it('lowers wall association accuracy for a bad observation that fits another wall better', () => {
     const state = createSimulationStateForScenario('ambiguous-parallel-corridor')
     const trueWall = state.environment.walls.find((wall) => wall.id === 'near-lower-wall')
