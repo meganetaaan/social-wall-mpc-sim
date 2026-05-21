@@ -1,4 +1,5 @@
 import { poseGaussianFromSigmas } from '../belief/poseBelief'
+import { createGridValueField } from '../planning/valueField'
 import { createInitialMetrics } from './metrics'
 import type {
   BeliefState,
@@ -149,21 +150,9 @@ const unknownMapBelief = (environment: Environment, mean: RobotState = { x: 0.85
   }
 }
 
-const spiralEnvironment: Environment = {
+const spiralEnvironmentBase: Environment = {
   goal: { x: 5.0, y: 2.5 },
   goalRadius: 0.24,
-  routeWaypoints: [
-    { x: 8.85, y: 0.7 },
-    { x: 8.85, y: 4.3 },
-    { x: 1.05, y: 4.3 },
-    { x: 1.05, y: 1.4 },
-    { x: 7.8, y: 1.4 },
-    { x: 7.8, y: 3.6 },
-    { x: 2.1, y: 3.6 },
-    { x: 2.1, y: 2.05 },
-    { x: 5.0, y: 2.05 },
-    { x: 5.0, y: 2.5 },
-  ],
   walls: [
     { id: 'spiral-outer-bottom', a: { x: 0.35, y: 0.35 }, b: { x: 9.45, y: 0.35 } },
     { id: 'spiral-outer-right', a: { x: 9.45, y: 0.35 }, b: { x: 9.45, y: 4.65 } },
@@ -181,6 +170,11 @@ const spiralEnvironment: Environment = {
     { id: 'spiral-center-bottom', a: { x: 2.55, y: 2.35 }, b: { x: 5.0, y: 2.35 } },
   ],
   obstacles: [],
+}
+
+const spiralEnvironment: Environment = {
+  ...spiralEnvironmentBase,
+  valueField: createGridValueField(spiralEnvironmentBase, { resolution: 0.2, robotRadius: 0.12 }),
 }
 
 const ambiguousParallelCorridorEnvironment: Environment = {

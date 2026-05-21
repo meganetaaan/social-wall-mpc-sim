@@ -2,13 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { poseGaussianFromSigmas } from '../belief/poseBelief'
 import { defaultParameters } from '../simulation/environment'
 import type { BeliefState, ControlInput, Environment, HumanState, RobotState, WallSegment } from '../simulation/types'
-import {
-  evaluateStageCost,
-  goalProgressCost,
-  humanSocialDistanceCost,
-  terminalGoalCost,
-  wallFollowingCost,
-} from './cost'
+import { evaluateStageCost, humanSocialDistanceCost, terminalGoalCost, wallFollowingCost } from './cost'
+import { createGridValueField } from './valueField'
 
 const wall: WallSegment = { id: 'north-wall', a: { x: 0, y: 0 }, b: { x: 10, y: 0 } }
 const robot: RobotState = { x: 1, y: 1, theta: 0 }
@@ -101,38 +96,23 @@ describe('modular MPC cost terms', () => {
     expect(forward.terms.goalProgress).toBeLessThan(stopped.terms.goalProgress)
   })
 
-  it('uses route waypoints instead of the final Euclidean goal for maze-like local progress', () => {
+  it('uses a value field instead of the final Euclidean goal for maze-like terminal cost', () => {
     const mazeEnvironment: Environment = {
-      walls: [wall],
-      obstacles: [],
-      goal: { x: 5, y: 2.5 },
-      routeWaypoints: [
-        { x: 7.8, y: 1.4 },
-        { x: 7.8, y: 3.6 },
-        { x: 5, y: 2.5 },
+      walls: [
+        { id: 'bottom', a: { x: 0, y: 0 }, b: { x: 6, y: 0 } },
+        { id: 'top', a: { x: 0, y: 3 }, b: { x: 6, y: 3 } },
+        { id: 'divider', a: { x: 3, y: 0 }, b: { x: 3, y: 2.25 } },
       ],
+      obstacles: [],
+      goal: { x: 2.5, y: 1.5 },
     }
-    const underGoalRobot: RobotState = { x: 5, y: 1.4, theta: 0 }
-
-    expect(goalProgressCost(underGoalRobot, { v: 0.6, omega: 0 }, mazeEnvironment, defaultParameters)).toBeLessThan(
-      goalProgressCost(underGoalRobot, { v: 0, omega: 0 }, mazeEnvironment, defaultParameters),
-    )
-  })
-
-  it('uses the active route waypoint for terminal rollout cost before the final goal', () => {
-    const mazeEnvironment: Environment = {
-      walls: [wall],
-      obstacles: [],
-      goal: { x: 5, y: 2.5 },
-      routeWaypoints: [
-        { x: 7.8, y: 1.4 },
-        { x: 7.8, y: 3.6 },
-        { x: 5, y: 2.5 },
-      ],
+    const environmentWithField = {
+      ...mazeEnvironment,
+      valueField: createGridValueField(mazeEnvironment, { resolution: 0.25, robotRadius: 0.08 }),
     }
 
-    expect(terminalGoalCost({ x: 7.8, y: 1.4, theta: 0 }, mazeEnvironment, defaultParameters)).toBeLessThan(
-      terminalGoalCost({ x: 5, y: 1.4, theta: 0 }, mazeEnvironment, defaultParameters),
+    expect(terminalGoalCost({ x: 3.5, y: 1.5, theta: 0 }, environmentWithField, defaultParameters)).toBeGreaterThan(
+      terminalGoalCost({ x: 4.0, y: 2.5, theta: 0 }, environmentWithField, defaultParameters),
     )
   })
 })

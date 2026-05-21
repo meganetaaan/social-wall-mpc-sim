@@ -43,12 +43,20 @@ export type WallObservation = {
   sensorPose: RobotState
 }
 export type StaticObstacle = { id: string; x: number; y: number; radius: number }
+export type GridValueField = {
+  origin: Vec2
+  width: number
+  height: number
+  resolution: number
+  values: number[]
+  unreachableCost: number
+}
 export type Environment = {
   walls: WallSegment[]
   obstacles: StaticObstacle[]
   goal: Vec2
   goalRadius?: number
-  routeWaypoints?: Vec2[]
+  valueField?: GridValueField
 }
 export type BeliefState = {
   pose: PoseGaussian
