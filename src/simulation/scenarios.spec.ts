@@ -68,7 +68,8 @@ describe('scenario definitions', () => {
     expect(known.environment.goal.x).toBeCloseTo(5, 1)
     expect(known.environment.goal.y).toBeCloseTo(2.95, 1)
     expect(known.environment.valueField).toBeDefined()
-    expect(unknown.environment.valueField?.values.length).toBe(known.environment.valueField?.values.length)
+    expect(unknown.environment.valueField).toBeDefined()
+    expect(unknown.environment.valueField?.values.length).toBeLessThan(known.environment.valueField?.values.length ?? 0)
     expect(known.humans).toEqual([])
     expect(unknown.humans).toEqual([])
     expect(known.belief.estimatedWalls.filter((wall) => wall.confidence > 0.6).length).toBeGreaterThan(

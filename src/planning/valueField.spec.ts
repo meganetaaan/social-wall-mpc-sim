@@ -28,4 +28,19 @@ describe('grid value field', () => {
 
     expect(lookupValueField(field, innerApproach)).toBeLessThan(lookupValueField(field, belowGoalLocalMinimum))
   })
+
+  it('computes unknown spiral cost-to-go from observed wall belief instead of true hidden walls', () => {
+    const known = createSimulationStateForScenario('spiral-known')
+    const unknown = createSimulationStateForScenario('spiral-unknown')
+    const wallSeparatedPoint: RobotState = { x: 4.2, y: 1.4, theta: 0 }
+
+    const unknownField = unknown.environment.valueField
+    const knownField = known.environment.valueField
+    expect(unknownField).toBeDefined()
+    expect(knownField).toBeDefined()
+    if (!unknownField || !knownField) throw new Error('spiral value fields should be defined')
+    expect(lookupValueField(unknownField, wallSeparatedPoint)).toBeLessThan(
+      lookupValueField(knownField, wallSeparatedPoint),
+    )
+  })
 })

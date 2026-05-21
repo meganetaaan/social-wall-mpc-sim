@@ -1,4 +1,5 @@
 import { poseGaussianFromSigmas } from '../belief/poseBelief'
+import { environmentWithBeliefValueField, spiralValueFieldOptions } from '../planning/beliefValueField'
 import { createGridValueField } from '../planning/valueField'
 import { createInitialMetrics } from './metrics'
 import type {
@@ -174,7 +175,7 @@ const spiralEnvironmentBase: Environment = {
 
 const spiralEnvironment: Environment = {
   ...spiralEnvironmentBase,
-  valueField: createGridValueField(spiralEnvironmentBase, { resolution: 0.2, robotRadius: 0.22 }),
+  valueField: createGridValueField(spiralEnvironmentBase, spiralValueFieldOptions),
 }
 
 const ambiguousParallelCorridorEnvironment: Environment = {
@@ -361,11 +362,12 @@ export const scenarioDefinitions: ScenarioDefinition[] = [
 export function createSimulationStateForScenario(scenarioId: ScenarioId): SimulationState {
   const scenario = scenarioDefinitions.find((candidate) => candidate.id === scenarioId)
   if (!scenario) throw new Error(`Unknown scenario: ${scenarioId}`)
-  const environment = clone(scenario.environment)
+  const baseEnvironment = clone(scenario.environment)
   const initialBelief =
     typeof scenario.initialBelief === 'function'
-      ? scenario.initialBelief(environment)
-      : (scenario.initialBelief ?? scenarioBelief(environment, undefined, scenario.initialRobot))
+      ? scenario.initialBelief(baseEnvironment)
+      : (scenario.initialBelief ?? scenarioBelief(baseEnvironment, undefined, scenario.initialRobot))
+  const environment = environmentWithBeliefValueField(baseEnvironment, initialBelief)
   const state: SimulationState = {
     time: 0,
     robot: clone(scenario.initialRobot),

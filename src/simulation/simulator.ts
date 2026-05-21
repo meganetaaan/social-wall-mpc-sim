@@ -1,5 +1,6 @@
 import { updateBelief } from '../belief/simpleBelief'
 import { observeWalls } from '../belief/wallMapBelief'
+import { environmentWithBeliefValueField } from '../planning/beliefValueField'
 import { planWithPolicy } from '../planning/policies'
 import { predictHumans, stepRobot } from './dynamics'
 import { updateSimulationMetrics } from './metrics'
@@ -15,14 +16,15 @@ export function stepSimulation(
   const robot = stepRobot(state.robot, plan.bestControl, parameters.dt)
   const humans = predictHumans(state.humans, parameters.dt, undefined, robot, state.time)
   const belief = updateBelief(state.belief, robot, state.environment, parameters, state.time + parameters.dt)
-  const currentObservations = observeWalls(robot, state.environment, parameters)
+  const environment = environmentWithBeliefValueField(state.environment, belief)
+  const currentObservations = observeWalls(robot, environment, parameters)
   const trace = [...state.trace, { x: robot.x, y: robot.y }].slice(-650)
   const metrics = updateSimulationMetrics({
     previous: state.metrics,
     previousRobot: state.robot,
     robot,
     humans,
-    environment: state.environment,
+    environment,
     belief,
     control: plan.bestControl,
     selectedCost: plan.selected.cost.total,
@@ -34,6 +36,7 @@ export function stepSimulation(
     time: state.time + parameters.dt,
     robot,
     humans,
+    environment,
     belief,
     trace,
     currentObservations,
