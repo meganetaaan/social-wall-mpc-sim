@@ -104,7 +104,7 @@ const scenarioBelief = (
   }
 }
 
-const knownMapBelief = (environment: Environment, mean: RobotState = { x: 0.85, y: 0.82, theta: 0 }): BeliefState => {
+const knownMapBelief = (environment: Environment, mean: RobotState = { x: 0.85, y: 0.55, theta: 0 }): BeliefState => {
   const sigmaX = 0.08
   const sigmaY = 0.08
   const sigmaTheta = 0.03
@@ -125,7 +125,7 @@ const knownMapBelief = (environment: Environment, mean: RobotState = { x: 0.85, 
   }
 }
 
-const unknownMapBelief = (environment: Environment, mean: RobotState = { x: 0.85, y: 0.82, theta: 0 }): BeliefState => {
+const unknownMapBelief = (environment: Environment, mean: RobotState = { x: 0.85, y: 0.55, theta: 0 }): BeliefState => {
   const sigmaX = 0.18
   const sigmaY = 0.18
   const sigmaTheta = 0.08
@@ -151,30 +151,30 @@ const unknownMapBelief = (environment: Environment, mean: RobotState = { x: 0.85
 }
 
 const spiralEnvironmentBase: Environment = {
-  goal: { x: 5.0, y: 2.5 },
+  goal: { x: 5.0, y: 2.95 },
   goalRadius: 0.24,
   walls: [
-    { id: 'spiral-outer-bottom', a: { x: 0.35, y: 0.35 }, b: { x: 9.45, y: 0.35 } },
-    { id: 'spiral-outer-right', a: { x: 9.45, y: 0.35 }, b: { x: 9.45, y: 4.65 } },
-    { id: 'spiral-outer-top', a: { x: 9.45, y: 4.65 }, b: { x: 0.35, y: 4.65 } },
-    { id: 'spiral-outer-left', a: { x: 0.35, y: 4.65 }, b: { x: 0.35, y: 1.05 } },
-    { id: 'spiral-entry-left-lip', a: { x: 0.35, y: 1.05 }, b: { x: 1.25, y: 1.05 } },
-    { id: 'spiral-lane-bottom', a: { x: 1.25, y: 1.05 }, b: { x: 8.35, y: 1.05 } },
-    { id: 'spiral-lane-right', a: { x: 8.35, y: 1.05 }, b: { x: 8.35, y: 3.95 } },
-    { id: 'spiral-lane-top', a: { x: 8.35, y: 3.95 }, b: { x: 1.65, y: 3.95 } },
-    { id: 'spiral-lane-left', a: { x: 1.65, y: 3.95 }, b: { x: 1.65, y: 1.75 } },
+    { id: 'spiral-outer-bottom', a: { x: 0.35, y: 0.15 }, b: { x: 9.45, y: 0.15 } },
+    { id: 'spiral-outer-right', a: { x: 9.45, y: 0.15 }, b: { x: 9.45, y: 4.95 } },
+    { id: 'spiral-outer-top', a: { x: 9.45, y: 4.95 }, b: { x: 0.35, y: 4.95 } },
+    { id: 'spiral-outer-left', a: { x: 0.35, y: 4.95 }, b: { x: 0.35, y: 0.95 } },
+    { id: 'spiral-entry-left-lip', a: { x: 0.35, y: 0.95 }, b: { x: 1.25, y: 0.95 } },
+    { id: 'spiral-lane-bottom', a: { x: 1.25, y: 0.95 }, b: { x: 8.35, y: 0.95 } },
+    { id: 'spiral-lane-right', a: { x: 8.35, y: 0.95 }, b: { x: 8.35, y: 4.15 } },
+    { id: 'spiral-lane-top', a: { x: 8.35, y: 4.15 }, b: { x: 1.65, y: 4.15 } },
+    { id: 'spiral-lane-left', a: { x: 1.65, y: 4.15 }, b: { x: 1.65, y: 1.75 } },
     { id: 'spiral-inner-bottom', a: { x: 1.65, y: 1.75 }, b: { x: 7.25, y: 1.75 } },
-    { id: 'spiral-inner-right', a: { x: 7.25, y: 1.75 }, b: { x: 7.25, y: 3.25 } },
-    { id: 'spiral-inner-top', a: { x: 7.25, y: 3.25 }, b: { x: 2.55, y: 3.25 } },
-    { id: 'spiral-inner-left', a: { x: 2.55, y: 3.25 }, b: { x: 2.55, y: 2.35 } },
-    { id: 'spiral-center-bottom', a: { x: 2.55, y: 2.35 }, b: { x: 5.0, y: 2.35 } },
+    { id: 'spiral-inner-right', a: { x: 7.25, y: 1.75 }, b: { x: 7.25, y: 3.35 } },
+    { id: 'spiral-inner-top', a: { x: 7.25, y: 3.35 }, b: { x: 2.55, y: 3.35 } },
+    { id: 'spiral-inner-left', a: { x: 2.55, y: 3.35 }, b: { x: 2.55, y: 2.55 } },
+    { id: 'spiral-center-bottom', a: { x: 2.55, y: 2.55 }, b: { x: 5.0, y: 2.55 } },
   ],
   obstacles: [],
 }
 
 const spiralEnvironment: Environment = {
   ...spiralEnvironmentBase,
-  valueField: createGridValueField(spiralEnvironmentBase, { resolution: 0.2, robotRadius: 0.12 }),
+  valueField: createGridValueField(spiralEnvironmentBase, { resolution: 0.2, robotRadius: 0.22 }),
 }
 
 const ambiguousParallelCorridorEnvironment: Environment = {
@@ -341,7 +341,7 @@ export const scenarioDefinitions: ScenarioDefinition[] = [
     name: 'Spiral corridor known map',
     description: 'A rectangular spiral corridor with the goal in the center and most walls already known in belief.',
     seed: 714,
-    initialRobot: { x: 0.85, y: 0.82, theta: 0 },
+    initialRobot: { x: 0.85, y: 0.55, theta: 0 },
     humans: [],
     environment: spiralEnvironment,
     initialBelief: knownMapBelief,
@@ -351,7 +351,7 @@ export const scenarioDefinitions: ScenarioDefinition[] = [
     name: 'Spiral corridor unknown map',
     description: 'The same center-goal spiral, but only the entry wall is initially believed with low confidence.',
     seed: 815,
-    initialRobot: { x: 0.85, y: 0.82, theta: 0 },
+    initialRobot: { x: 0.85, y: 0.55, theta: 0 },
     humans: [],
     environment: spiralEnvironment,
     initialBelief: unknownMapBelief,

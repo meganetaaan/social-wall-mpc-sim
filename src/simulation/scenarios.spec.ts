@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { defaultParameters } from './environment'
 import { createSimulationStateForScenario, scenarioDefinitions } from './scenarios'
 
 describe('scenario definitions', () => {
@@ -65,7 +66,7 @@ describe('scenario definitions', () => {
     expect(known.environment.walls.length).toBeGreaterThanOrEqual(12)
     expect(unknown.environment.walls.length).toBe(known.environment.walls.length)
     expect(known.environment.goal.x).toBeCloseTo(5, 1)
-    expect(known.environment.goal.y).toBeCloseTo(2.5, 1)
+    expect(known.environment.goal.y).toBeCloseTo(2.95, 1)
     expect(known.environment.valueField).toBeDefined()
     expect(unknown.environment.valueField?.values.length).toBe(known.environment.valueField?.values.length)
     expect(known.humans).toEqual([])
@@ -74,6 +75,28 @@ describe('scenario definitions', () => {
       known.environment.walls.length / 2,
     )
     expect(unknown.belief.estimatedWalls.filter((wall) => wall.confidence > 0.1).length).toBeLessThan(3)
+  })
+
+  it('keeps spiral corridor lanes wider than the wall collision band on both sides', () => {
+    const state = createSimulationStateForScenario('spiral-known')
+    const wallById = new Map(state.environment.walls.map((wall) => [wall.id, wall]))
+    const verticalLaneGaps = [
+      ['spiral-outer-bottom', 'spiral-lane-bottom'],
+      ['spiral-lane-bottom', 'spiral-inner-bottom'],
+      ['spiral-inner-bottom', 'spiral-center-bottom'],
+      ['spiral-inner-top', 'spiral-lane-top'],
+      ['spiral-lane-top', 'spiral-outer-top'],
+    ] as const
+    const minimumLaneWidth = defaultParameters.wallCollisionDistance * 2 + 0.08
+
+    for (const [lowerId, upperId] of verticalLaneGaps) {
+      const lower = wallById.get(lowerId)
+      const upper = wallById.get(upperId)
+      expect(lower, lowerId).toBeDefined()
+      expect(upper, upperId).toBeDefined()
+      const laneWidth = Math.abs((upper?.a.y ?? 0) - (lower?.a.y ?? 0))
+      expect(laneWidth, `${lowerId} ↔ ${upperId}`).toBeGreaterThanOrEqual(minimumLaneWidth - 1e-9)
+    }
   })
 
   it('adds an ambiguous parallel corridor scenario with finite initial metrics', () => {
