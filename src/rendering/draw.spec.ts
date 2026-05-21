@@ -98,7 +98,10 @@ describe('drawScene', () => {
     })
 
     expect(calls).toContain('fillText:value field cost-to-go')
-    expect(calls.some((call) => call.startsWith('fillStyle:rgba(34, 211, 238'))).toBe(true)
+    expect(calls).toContain('fillText:low V → high V')
+    expect(calls.some((call) => call.startsWith('fillStyle:rgba(14, 165, 233'))).toBe(true)
+    expect(calls.some((call) => call.startsWith('fillStyle:rgba(250, 204, 21'))).toBe(true)
+    expect(calls).toContain('strokeStyle:rgba(250, 204, 21, 0.82)')
   })
 
   it('draws wall map confidence as a belief layer', () => {

@@ -193,29 +193,74 @@ function drawValueField(ctx: CanvasRenderingContext2D, environment: Environment,
   if (!field) return
   const reachable = field.values.filter((value) => Number.isFinite(value) && value < field.unreachableCost)
   if (reachable.length === 0) return
-  const min = Math.min(...reachable)
-  const max = Math.max(...reachable)
-  const span = Math.max(1e-6, max - min)
+  const sorted = [...reachable].sort((a, b) => a - b)
+  const low = percentile(sorted, 0.05)
+  const high = percentile(sorted, 0.95)
+  const span = Math.max(1e-6, high - low)
   const cellSize = field.resolution * transform.scale
   for (let y = 0; y < field.height; y += 1) {
     for (let x = 0; x < field.width; x += 1) {
       const value = field.values[y * field.width + x]
       if (!Number.isFinite(value) || value >= field.unreachableCost) continue
-      const normalized = 1 - (value - min) / span
-      const alpha = 0.05 + normalized * 0.2
+      const normalized = Math.max(0, Math.min(1, (value - low) / span))
       const world = {
         x: field.origin.x + x * field.resolution,
         y: field.origin.y + y * field.resolution,
       }
       const canvas = worldToCanvas(world, transform)
-      ctx.fillStyle = `rgba(34, 211, 238, ${alpha.toFixed(3)})`
+      ctx.fillStyle = valueFieldColor(normalized)
       ctx.fillRect(canvas.x - cellSize / 2, canvas.y - cellSize / 2, cellSize, cellSize)
     }
   }
 
+  drawValueFieldArrows(ctx, field, transform)
+
   ctx.fillStyle = '#67e8f9'
   ctx.font = '12px Inter, sans-serif'
   ctx.fillText('value field cost-to-go', 32, 40)
+  ctx.fillText('low V → high V', 32, 56)
+}
+
+function percentile(sorted: number[], q: number) {
+  if (sorted.length === 0) return 0
+  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor((sorted.length - 1) * q)))]
+}
+
+function valueFieldColor(normalized: number) {
+  const alpha = (0.28 + (1 - normalized) * 0.36).toFixed(3)
+  if (normalized < 0.28) return `rgba(250, 204, 21, ${alpha})`
+  if (normalized < 0.58) return `rgba(34, 211, 238, ${alpha})`
+  return `rgba(14, 165, 233, ${alpha})`
+}
+
+function drawValueFieldArrows(
+  ctx: CanvasRenderingContext2D,
+  field: NonNullable<Environment['valueField']>,
+  transform: Transform,
+) {
+  const stride = Math.max(2, Math.round(0.8 / field.resolution))
+  ctx.strokeStyle = 'rgba(250, 204, 21, 0.82)'
+  ctx.lineWidth = 1.5
+  for (let y = 0; y < field.height; y += stride) {
+    for (let x = 0; x < field.width; x += stride) {
+      const here = field.values[y * field.width + x]
+      if (!Number.isFinite(here) || here >= field.unreachableCost) continue
+      const right = x + 1 < field.width ? field.values[y * field.width + x + 1] : here
+      const up = y + 1 < field.height ? field.values[(y + 1) * field.width + x] : here
+      const dx = right < here ? 1 : 0
+      const dy = up < here ? 1 : 0
+      if (dx === 0 && dy === 0) continue
+      const start = worldToCanvas(
+        { x: field.origin.x + x * field.resolution, y: field.origin.y + y * field.resolution },
+        transform,
+      )
+      const length = field.resolution * transform.scale * 1.4
+      ctx.beginPath()
+      ctx.moveTo(start.x, start.y)
+      ctx.lineTo(start.x + dx * length, start.y - dy * length)
+      ctx.stroke()
+    }
+  }
 }
 
 function drawSensorFov(
