@@ -3,7 +3,7 @@ import { observePointReturns } from '../belief/pointObjectBelief'
 import { observeWalls } from '../belief/wallMapBelief'
 import { environmentWithBeliefValueField } from '../planning/beliefValueField'
 import { planWithPolicy } from '../planning/policies'
-import { predictHumans, stepRobot } from './dynamics'
+import { predictHumans, stepRobotInEnvironment } from './dynamics'
 import { updateSimulationMetrics } from './metrics'
 import type { PlannerMode, PlannerParameters, SimulationState } from './types'
 
@@ -14,7 +14,7 @@ export function stepSimulation(
   plannerMode: PlannerMode = 'belief-mpc',
 ): SimulationState {
   const plan = planWithPolicy({ mode: plannerMode, state, parameters, seed: seed + Math.floor(state.time * 1000) })
-  const robot = stepRobot(state.robot, plan.bestControl, parameters.dt)
+  const robot = stepRobotInEnvironment(state.robot, plan.bestControl, parameters.dt, state.environment, parameters)
   const humans = predictHumans(state.humans, parameters.dt, undefined, robot, state.time)
   const currentPointObservations = observePointReturns({
     robot,

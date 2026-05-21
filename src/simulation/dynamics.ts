@@ -1,5 +1,5 @@
-import { clamp, normAngle } from './math'
-import type { ControlInput, HumanState, PlannerParameters, RobotState, Vec2 } from './types'
+import { clamp, distance, nearestWall, normAngle } from './math'
+import type { ControlInput, Environment, HumanState, PlannerParameters, RobotState, Vec2, WallSegment } from './types'
 
 export function clampControl(u: ControlInput, p: PlannerParameters): ControlInput {
   return { v: clamp(u.v, p.vMin, p.vMax), omega: clamp(u.omega, p.omegaMin, p.omegaMax) }
@@ -11,6 +11,53 @@ export function stepRobot(robot: RobotState, control: ControlInput, dt: number):
     y: robot.y + control.v * Math.sin(robot.theta) * dt,
     theta: normAngle(robot.theta + control.omega * dt),
   }
+}
+
+export function stepRobotInEnvironment(
+  robot: RobotState,
+  control: ControlInput,
+  dt: number,
+  environment: Environment,
+  options: Pick<PlannerParameters, 'robotRadius'>,
+): RobotState {
+  const next = stepRobot(robot, control, dt)
+  const collision = firstWallCollision(robot, next, environment.walls, options.robotRadius)
+  if (!collision) return next
+  return {
+    x: collision.safePoint.x,
+    y: collision.safePoint.y,
+    theta: normAngle(robot.theta + control.omega * dt),
+  }
+}
+
+function firstWallCollision(from: RobotState, to: RobotState, walls: WallSegment[], robotRadius: number) {
+  let best: { t: number; safePoint: Vec2 } | null = null
+  for (const wall of walls) {
+    const hit = segmentIntersectionParameter(from, to, wall.a, wall.b)
+    const near = nearestWall(to, [wall]).distance < robotRadius
+    if (hit === null && !near) continue
+    const t = hit ?? 1
+    const safeT = clamp(t - robotRadius / Math.max(0.001, distance(from, to)), 0, 1)
+    const safePoint = { x: from.x + (to.x - from.x) * safeT, y: from.y + (to.y - from.y) * safeT }
+    if (!best || t < best.t) best = { t, safePoint }
+  }
+  return best
+}
+
+function segmentIntersectionParameter(a: Vec2, b: Vec2, c: Vec2, d: Vec2): number | null {
+  const r = { x: b.x - a.x, y: b.y - a.y }
+  const s = { x: d.x - c.x, y: d.y - c.y }
+  const denom = cross(r, s)
+  if (Math.abs(denom) < 1e-9) return null
+  const cma = { x: c.x - a.x, y: c.y - a.y }
+  const t = cross(cma, s) / denom
+  const u = cross(cma, r) / denom
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null
+  return t
+}
+
+function cross(a: Vec2, b: Vec2) {
+  return a.x * b.y - a.y * b.x
 }
 
 export function predictHumans(

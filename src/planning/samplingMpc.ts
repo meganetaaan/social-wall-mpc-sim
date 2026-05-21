@@ -1,4 +1,4 @@
-import { clampControl, stepRobot } from '../simulation/dynamics'
+import { clampControl, stepRobotInEnvironment } from '../simulation/dynamics'
 import { mulberry32, nearestWall, normAngle, wallTangentAngle } from '../simulation/math'
 import type { ControlInput, PlannerParameters, PlanningResult, SimulationState } from '../simulation/types'
 import { rolloutCandidate } from './rollout'
@@ -62,7 +62,7 @@ function guideSequence(state: SimulationState, p: PlannerParameters, kind: 'goal
       p,
     )
     controls.push(control)
-    robot = stepRobot(robot, control, p.dt)
+    robot = stepRobotInEnvironment(robot, control, p.dt, state.environment, p)
     previous = control
   }
   return controls
@@ -88,7 +88,7 @@ function guideValueFieldSequence(state: SimulationState, p: PlannerParameters): 
       p,
     )
     controls.push(control)
-    robot = stepRobot(robot, control, p.dt)
+    robot = stepRobotInEnvironment(robot, control, p.dt, state.environment, p)
     previous = control
   }
   return controls

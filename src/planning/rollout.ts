@@ -1,5 +1,5 @@
 import { transitionBelief } from '../belief/beliefTransition'
-import { predictHumans, stepRobot } from '../simulation/dynamics'
+import { predictHumans, stepRobotInEnvironment } from '../simulation/dynamics'
 import type {
   BeliefState,
   CandidateRollout,
@@ -59,7 +59,7 @@ export function rolloutCandidate(args: {
       parameters: args.parameters,
     })
     cost = addCost(cost, stage)
-    robot = stepRobot(robot, control, args.parameters.dt)
+    robot = stepRobotInEnvironment(robot, control, args.parameters.dt, args.environment, args.parameters)
     humans = predictHumans(humans, args.parameters.dt, undefined, robot, rolloutTime)
     rolloutTime += args.parameters.dt
     belief = transitionBelief({

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { predictHumans } from './dynamics'
-import type { HumanState } from './types'
+import { predictHumans, stepRobotInEnvironment } from './dynamics'
+import type { Environment, HumanState } from './types'
 
 describe('human motion patterns', () => {
   it('lets a following human stay behind the robot while moving along the corridor', () => {
@@ -43,5 +43,21 @@ describe('human motion patterns', () => {
 
     expect(before.y).toBeCloseTo(blocker.y)
     expect(after.y).toBeGreaterThan(blocker.y)
+  })
+})
+
+describe('robot wall collision dynamics', () => {
+  it('does not let the robot center cross a wall segment in one simulation step', () => {
+    const environment: Environment = {
+      walls: [{ id: 'vertical-wall', a: { x: 1, y: -1 }, b: { x: 1, y: 1 } }],
+      obstacles: [],
+      goal: { x: 2, y: 0 },
+    }
+
+    const next = stepRobotInEnvironment({ x: 0.8, y: 0, theta: 0 }, { v: 1.0, omega: 0 }, 0.4, environment, {
+      robotRadius: 0.1,
+    })
+
+    expect(next.x).toBeLessThanOrEqual(0.9)
   })
 })
