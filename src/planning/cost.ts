@@ -7,6 +7,7 @@ import type {
   CostBreakdown,
   Environment,
   HumanState,
+  ObjectBelief,
   PlannerParameters,
   RobotState,
   WallSegment,
@@ -52,6 +53,21 @@ export function humanSocialDistanceCost(robot: RobotState, humans: HumanState[],
   return { total }
 }
 
+export function objectSocialDistanceCost(robot: RobotState, objects: ObjectBelief[], p: PlannerParameters) {
+  let total = 0
+  for (const object of objects) {
+    const r = distance({ x: robot.x, y: robot.y }, object.centroid)
+    const humanWeight = Math.max(0, object.pHuman)
+    if (r < p.dMin) {
+      total += humanWeight * 100_000 * p.wHuman * (1 + (p.dMin - r) ** 2)
+    } else {
+      total += (humanWeight * (p.wHuman * 0.25)) / Math.max(0.03, r - p.dMin) ** 2
+      total += humanWeight * p.wHuman * Math.max(0, Math.abs(r - p.dPref) - p.dTolerance) ** 2
+    }
+  }
+  return { total }
+}
+
 export function collisionCost(robot: RobotState, environment: Environment, humans: HumanState[], p: PlannerParameters) {
   const point = { x: robot.x, y: robot.y }
   const nearest = nearestWall(point, environment.walls)
@@ -86,7 +102,7 @@ export function evaluateStageCost(args: {
   const wall = wallFollowingCost(robot, nearest.wall, parameters)
   terms.wall = wall.distance
   terms.wallHeading = wall.heading
-  terms.human = humanSocialDistanceCost(robot, humans, parameters).total
+  terms.human = objectSocialDistanceCost(robot, belief.objectBeliefs ?? [], parameters).total
   terms.collision = collisionCost(robot, environment, humans, parameters)
   terms.control = parameters.wControlV * control.v ** 2 + parameters.wControlOmega * control.omega ** 2
   terms.smoothness =

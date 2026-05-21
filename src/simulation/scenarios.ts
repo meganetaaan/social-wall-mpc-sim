@@ -102,6 +102,7 @@ const scenarioBelief = (
       confidence: index === 0 ? 0.72 : 0,
       lastObservedAt: index === 0 ? 0 : -1,
     })),
+    objectBeliefs: [],
   }
 }
 
@@ -123,6 +124,7 @@ const knownMapBelief = (environment: Environment, mean: RobotState = { x: 0.85, 
       confidence: 0.88,
       lastObservedAt: 0,
     })),
+    objectBeliefs: [],
   }
 }
 
@@ -148,6 +150,7 @@ const unknownMapBelief = (environment: Environment, mean: RobotState = { x: 0.85
       confidence: index === 0 ? 0.32 : 0,
       lastObservedAt: index === 0 ? 0 : -1,
     })),
+    objectBeliefs: [],
   }
 }
 
@@ -377,6 +380,7 @@ export function createSimulationStateForScenario(scenarioId: ScenarioId): Simula
     belief: clone(initialBelief),
     trace: [{ x: scenario.initialRobot.x, y: scenario.initialRobot.y }],
     currentObservations: [],
+    currentPointObservations: [],
     plan: emptyPlan(),
     costBreakdown: emptyCost(),
     metrics: emptyMetrics(),

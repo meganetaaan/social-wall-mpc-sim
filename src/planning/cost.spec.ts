@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import { poseGaussianFromSigmas } from '../belief/poseBelief'
 import { defaultParameters } from '../simulation/environment'
-import type { BeliefState, ControlInput, Environment, HumanState, RobotState, WallSegment } from '../simulation/types'
-import { evaluateStageCost, humanSocialDistanceCost, terminalGoalCost, wallFollowingCost } from './cost'
+import type {
+  BeliefState,
+  ControlInput,
+  Environment,
+  HumanState,
+  ObjectBelief,
+  RobotState,
+  WallSegment,
+} from '../simulation/types'
+import {
+  evaluateStageCost,
+  humanSocialDistanceCost,
+  objectSocialDistanceCost,
+  terminalGoalCost,
+  wallFollowingCost,
+} from './cost'
 import { createGridValueField } from './valueField'
 
 const wall: WallSegment = { id: 'north-wall', a: { x: 0, y: 0 }, b: { x: 10, y: 0 } }
@@ -16,6 +30,7 @@ const belief: BeliefState = {
   mapConfidence: 0.9,
   wallBeliefs: [{ wallId: 'north-wall', confidence: 0.9, lastObservedAt: 0 }],
   estimatedWalls: [{ wallId: 'north-wall', tMin: 0, tMax: 0.8, confidence: 0.9, lastObservedAt: 0 }],
+  objectBeliefs: [],
 }
 
 describe('modular MPC cost terms', () => {
@@ -43,12 +58,83 @@ describe('modular MPC cost terms', () => {
     expect(humanSocialDistanceCost(robot, [tooCloseHuman], params).total).toBeGreaterThan(10_000)
   })
 
+  it('scales social distance cost by object human probability instead of truth labels', () => {
+    const params = { ...defaultParameters, dMin: 0.7, dPref: 1.6, wHuman: 10 }
+    const object: ObjectBelief = {
+      id: 'track-1',
+      centroid: { x: 1, y: 1.3 },
+      velocity: { x: 0.25, y: 0 },
+      radius: 0.23,
+      observedCount: 2,
+      lastObservedAt: 1,
+      pStatic: 0.15,
+      pDynamic: 0.85,
+      pHuman: 0.9,
+    }
+
+    const highHuman = objectSocialDistanceCost(robot, [object], params).total
+    const lowHuman = objectSocialDistanceCost(robot, [{ ...object, pHuman: 0.1 }], params).total
+
+    expect(highHuman).toBeGreaterThan(lowHuman * 5)
+  })
+
+  it('evaluates stage social risk from object belief even when true humans are empty', () => {
+    const objectBelief: ObjectBelief = {
+      id: 'track-1',
+      centroid: { x: 1, y: 1.3 },
+      velocity: { x: 0.25, y: 0 },
+      radius: 0.23,
+      observedCount: 2,
+      lastObservedAt: 1,
+      pStatic: 0.15,
+      pDynamic: 0.85,
+      pHuman: 0.9,
+    }
+
+    const withBelief = evaluateStageCost({
+      robot,
+      humans: [],
+      environment: { walls: [wall], obstacles: [], goal: { x: 8.9, y: 3.85 } },
+      belief: { ...belief, objectBeliefs: [objectBelief] },
+      control,
+      previousControl: { v: 0.4, omega: 0.1 },
+      parameters: defaultParameters,
+    })
+    const withoutBelief = evaluateStageCost({
+      robot,
+      humans: [{ id: 'truth-only', x: 1, y: 1.3, vx: 0, vy: 0, radius: 0.23 }],
+      environment: { walls: [wall], obstacles: [], goal: { x: 8.9, y: 3.85 } },
+      belief,
+      control,
+      previousControl: { v: 0.4, omega: 0.1 },
+      parameters: defaultParameters,
+    })
+
+    expect(withBelief.terms.human).toBeGreaterThan(0)
+    expect(withoutBelief.terms.human).toBe(0)
+  })
+
   it('returns a complete cost breakdown for one optimization stage', () => {
     const breakdown = evaluateStageCost({
       robot,
       humans: [{ id: 'h1', x: 2, y: 1, vx: 0, vy: 0, radius: 0.22 }],
       environment: { walls: [wall], obstacles: [], goal: { x: 8.9, y: 3.85 } },
-      belief,
+      belief: {
+        ...belief,
+        objectBeliefs: [
+          {
+            id: 'track-1',
+            centroid: { x: 2, y: 1 },
+            velocity: { x: 0.2, y: 0 },
+            radius: 0.22,
+            observedCount: 2,
+            lastObservedAt: 0,
+            pStatic: 0.2,
+            pDynamic: 0.8,
+            pHuman: 0.9,
+          },
+        ],
+      },
       control,
       previousControl: { v: 0.4, omega: 0.1 },
       parameters: defaultParameters,

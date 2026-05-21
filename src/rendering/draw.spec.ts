@@ -235,4 +235,64 @@ describe('drawScene', () => {
     expect(calls.some((call) => call.startsWith('strokeStyle:rgba(125, 211, 252'))).toBe(true)
     expect(calls).toContain('strokeStyle:rgba(34, 211, 238, 0.78)')
   })
+
+  it('draws raw point observations and object belief probability labels', () => {
+    const { ctx, calls } = createRecordingContext()
+
+    drawScene({
+      ctx,
+      width: 800,
+      height: 480,
+      environment: {
+        goal: { x: 8.9, y: 3.85 },
+        walls: [{ id: 'wall', a: { x: 0, y: 0 }, b: { x: 10, y: 0 } }],
+        obstacles: [],
+      },
+      belief: {
+        pose: poseGaussianFromSigmas({ x: 1, y: 1, theta: 0 }, 0.1, 0.1, 0.02),
+        sigmaX: 0.1,
+        sigmaY: 0.1,
+        sigmaTheta: 0.02,
+        mapConfidence: 0.24,
+        wallBeliefs: [{ wallId: 'wall', confidence: 0.24, lastObservedAt: 0 }],
+        estimatedWalls: [{ wallId: 'wall', tMin: 0.2, tMax: 0.55, confidence: 0.72, lastObservedAt: 0 }],
+        objectBeliefs: [
+          {
+            id: 'track-1',
+            centroid: { x: 1.4, y: 1 },
+            velocity: { x: 0.25, y: 0 },
+            radius: 0.23,
+            observedCount: 2,
+            lastObservedAt: 1,
+            pStatic: 0.1,
+            pDynamic: 0.9,
+            pHuman: 0.8,
+          },
+        ],
+      },
+      currentPointObservations: [
+        {
+          id: 'point-1',
+          point: { x: 1.4, y: 1 },
+          range: 0.4,
+          bearing: 0,
+          sensorPose: { x: 1, y: 1, theta: 0 },
+          time: 1,
+          source: 'point-sensor',
+        },
+      ],
+      robot: { x: 1, y: 1, theta: 0 },
+      humans: [],
+      trace: [],
+      candidates: [],
+      dMin: 0.7,
+      dPref: 1.5,
+      sensorRadius: 2,
+      sensorFov: Math.PI / 2,
+    })
+
+    expect(calls).toContain('fillText:point returns')
+    expect(calls).toContain('fillText:tracked object belief')
+    expect(calls).toContain('fillText:D 0.90 H 0.80')
+  })
 })

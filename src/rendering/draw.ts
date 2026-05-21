@@ -5,6 +5,7 @@ import type {
   CandidateRollout,
   Environment,
   HumanState,
+  PointObservation,
   RobotState,
   Vec2,
   WallObservation,
@@ -33,6 +34,7 @@ export function drawScene(args: {
   candidates: CandidateRollout[]
   selected?: CandidateRollout
   currentObservations?: WallObservation[]
+  currentPointObservations?: PointObservation[]
   dMin: number
   dPref: number
   sensorRadius: number
@@ -120,6 +122,37 @@ export function drawScene(args: {
       ctx.stroke()
       ctx.lineWidth = 2
       ctx.strokeStyle = 'rgba(186, 230, 253, 0.46)'
+    }
+  }
+
+  if (args.currentPointObservations && args.currentPointObservations.length > 0) {
+    ctx.fillStyle = '#fde68a'
+    ctx.font = '12px Inter, sans-serif'
+    ctx.fillText('point returns', 32, 72)
+    for (const observation of args.currentPointObservations) {
+      const p = worldToCanvas(observation.point, transform)
+      ctx.fillStyle = 'rgba(253, 224, 71, 0.88)'
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, 0.055 * transform.scale, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+
+  if (args.belief?.objectBeliefs && args.belief.objectBeliefs.length > 0) {
+    ctx.fillStyle = '#fbcfe8'
+    ctx.font = '12px Inter, sans-serif'
+    ctx.fillText('tracked object belief', 32, 88)
+    for (const object of args.belief.objectBeliefs) {
+      const p = worldToCanvas(object.centroid, transform)
+      const alpha = Math.max(0.18, object.pHuman).toFixed(2)
+      ctx.strokeStyle = `rgba(244, 114, 182, ${alpha})`
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, Math.max(0.12, object.radius) * transform.scale, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.fillStyle = '#fbcfe8'
+      ctx.font = '11px Inter, sans-serif'
+      ctx.fillText(`D ${object.pDynamic.toFixed(2)} H ${object.pHuman.toFixed(2)}`, p.x + 8, p.y - 8)
     }
   }
 

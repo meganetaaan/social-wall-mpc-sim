@@ -42,6 +42,26 @@ export type WallObservation = {
   rayTarget: Vec2
   sensorPose: RobotState
 }
+export type PointObservation = {
+  id: string
+  point: Vec2
+  range: number
+  bearing: number
+  sensorPose: RobotState
+  time: number
+  source: 'point-sensor'
+}
+export type ObjectBelief = {
+  id: string
+  centroid: Vec2
+  velocity: Vec2
+  radius: number
+  observedCount: number
+  lastObservedAt: number
+  pStatic: number
+  pDynamic: number
+  pHuman: number
+}
 export type StaticObstacle = { id: string; x: number; y: number; radius: number }
 export type GridValueField = {
   origin: Vec2
@@ -66,6 +86,7 @@ export type BeliefState = {
   mapConfidence: number
   wallBeliefs: WallBelief[]
   estimatedWalls: EstimatedWallSegment[]
+  objectBeliefs?: ObjectBelief[]
 }
 export type CostTerms = {
   wall: number
@@ -155,6 +176,7 @@ export type SimulationState = {
   belief: BeliefState
   trace: Vec2[]
   currentObservations: WallObservation[]
+  currentPointObservations: PointObservation[]
   plan: PlanningResult
   costBreakdown: CostBreakdown
   metrics: SimulationMetrics

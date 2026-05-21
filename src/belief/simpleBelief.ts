@@ -3,10 +3,12 @@ import type {
   BeliefState,
   Environment,
   PlannerParameters,
+  PointObservation,
   PoseGaussian,
   RobotState,
   WallBelief,
 } from '../simulation/types'
+import { updateObjectBeliefs } from './pointObjectBelief'
 import {
   correctPoseGaussianWithObservation,
   poseGaussianFromSigmas,
@@ -49,6 +51,7 @@ export function updateBelief(
   environment: Environment,
   parameters: PlannerParameters,
   time = 0,
+  pointObservations: PointObservation[] = [],
 ): BeliefState {
   const nearest = nearestWall({ x: robot.x, y: robot.y }, environment.walls)
   const observationStrength = Math.max(0, 1 - nearest.distance / 2.2)
@@ -79,12 +82,14 @@ export function updateBelief(
     }
   })
   const mapConfidence = 1 - computeMapUncertainty(estimatedWalls)
+  const objectBeliefs = updateObjectBeliefs(belief.objectBeliefs ?? [], pointObservations, time)
   return {
     pose: correctedPose,
     ...sigmas,
     mapConfidence,
     wallBeliefs,
     estimatedWalls,
+    objectBeliefs,
   }
 }
 
