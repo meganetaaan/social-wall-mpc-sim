@@ -13,6 +13,18 @@ and worker handler so policy construction can be hosted off the UI thread. Brows
 the Vite module Worker when Worker construction is available, and falls back silently to the deterministic
 in-process service for tests, SSR, and non-browser execution.
 
+The Worker-backed service uses the same staged construction model as the in-process service. A cold request
+posts `request-policy` to register or check cache state, then subsequent planner/UI ticks call
+`advancePendingBuilds`, which posts `advance-policy-build` with a bounded work budget for each pending
+policy. The worker returns `policy-pending` until the value-iteration build is ready, then returns
+`policy-ready`; the browser service stores that policy locally for deterministic hits. Worker failures are
+captured as `lastError` in the service stats instead of being hidden behind fallback behavior.
+
+The simulator sidebar now includes a compact state-lattice status panel. It reports whether the active
+backend is `worker` or `in-process`, ready and pending policy counts, cache hits and misses, and the latest
+worker error. This is intentionally observability only: while a policy is pending or a lattice source is not
+reliable, `state-lattice` mode continues to use the existing safe baseline control.
+
 The runtime lattice source now goes through belief-derived map selection before policy construction. Known-map
 beliefs with broad high-confidence true-ID coverage continue to use the full scenario environment. Unknown-map
 beliefs prefer anonymous estimated line features when present, preserving feature IDs instead of falling back to

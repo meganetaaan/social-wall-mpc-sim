@@ -181,6 +181,20 @@ dd {
   padding: 0;
   overflow: visible;
 }
+.policy-status-panel {
+  padding: 14px 16px;
+}
+.policy-status-grid {
+  grid-template-columns: 1fr;
+}
+.policy-status-grid div {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.policy-status-grid dd {
+  max-width: 210px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
 .panel-heading {
   display: flex;
   align-items: center;

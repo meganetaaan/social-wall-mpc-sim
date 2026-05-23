@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 import { defaultPlannerMode } from './planning/policies'
+import { getStateLatticePolicyService } from './planning/stateLatticePolicyService'
 import { CanvasView } from './rendering/CanvasView'
 import { createDefaultSimulationState, defaultParameters } from './simulation/environment'
 import { createSimulationStateForScenario, type ScenarioId, scenarioDefinitions } from './simulation/scenarios'
@@ -11,17 +12,28 @@ import { CostPanel } from './ui/CostPanel'
 import { ExperimentSummaryPanel } from './ui/ExperimentSummaryPanel'
 import { ParameterPanel } from './ui/ParameterPanel'
 
+const stateLatticePolicyUiWorkBudget = 65536
+
 export default function App() {
   const [parameters, setParameters] = useState<PlannerParameters>(defaultParameters)
   const [scenarioId, setScenarioId] = useState<ScenarioId>('crossing-human')
   const [plannerMode, setPlannerMode] = useState<PlannerMode>(defaultPlannerMode)
   const [state, setState] = useState<SimulationState>(() => createDefaultSimulationState())
   const [running, setRunning] = useState(true)
+  const [policyStats, setPolicyStats] = useState(() => getStateLatticePolicyService().cacheStats())
   const seedRef = useRef(scenarioDefinitions[0].seed)
-  const step = useCallback(
-    () => setState((current) => stepSimulation(current, parameters, seedRef.current++, plannerMode)),
-    [parameters, plannerMode],
-  )
+  const refreshPolicyStats = useCallback(() => {
+    setPolicyStats(getStateLatticePolicyService().cacheStats())
+  }, [])
+  const advanceStateLatticePolicyWork = useCallback(() => {
+    if (plannerMode === 'state-lattice')
+      getStateLatticePolicyService().advancePendingBuilds(stateLatticePolicyUiWorkBudget)
+    refreshPolicyStats()
+  }, [plannerMode, refreshPolicyStats])
+  const step = useCallback(() => {
+    setState((current) => stepSimulation(current, parameters, seedRef.current++, plannerMode))
+    advanceStateLatticePolicyWork()
+  }, [advanceStateLatticePolicyWork, parameters, plannerMode])
 
   useEffect(() => {
     if (!running) return
@@ -43,16 +55,23 @@ export default function App() {
     }
   }, [running, step])
 
+  useEffect(() => {
+    const interval = window.setInterval(advanceStateLatticePolicyWork, 250)
+    return () => window.clearInterval(interval)
+  }, [advanceStateLatticePolicyWork])
+
   const reset = () => {
     const scenario = scenarioDefinitions.find((candidate) => candidate.id === scenarioId) ?? scenarioDefinitions[0]
     seedRef.current = scenario.seed
     setState(createSimulationStateForScenario(scenario.id))
+    refreshPolicyStats()
   }
   const changeScenario = (nextScenarioId: ScenarioId) => {
     const scenario = scenarioDefinitions.find((candidate) => candidate.id === nextScenarioId) ?? scenarioDefinitions[0]
     setScenarioId(scenario.id)
     seedRef.current = scenario.seed
     setState(createSimulationStateForScenario(scenario.id))
+    refreshPolicyStats()
   }
   const scenario = scenarioDefinitions.find((candidate) => candidate.id === scenarioId) ?? scenarioDefinitions[0]
   return (
@@ -93,6 +112,31 @@ export default function App() {
                 <option value="reactive-stop">reactive-stop hard-switch baseline</option>
               </select>
             </label>
+          </section>
+          <section className="panel policy-status-panel">
+            <h2>State-lattice policy service</h2>
+            <dl className="metric-grid policy-status-grid">
+              <div>
+                <dt>backend</dt>
+                <dd>{policyStats.backend}</dd>
+              </div>
+              <div>
+                <dt>ready / pending</dt>
+                <dd>
+                  {policyStats.ready} / {policyStats.pending}
+                </dd>
+              </div>
+              <div>
+                <dt>hits / misses</dt>
+                <dd>
+                  {policyStats.hits} / {policyStats.misses}
+                </dd>
+              </div>
+              <div>
+                <dt>worker error</dt>
+                <dd>{policyStats.lastError ?? 'none'}</dd>
+              </div>
+            </dl>
           </section>
           <ParameterPanel parameters={parameters} onChange={setParameters} />
           <CostPanel cost={state.costBreakdown} state={state} />

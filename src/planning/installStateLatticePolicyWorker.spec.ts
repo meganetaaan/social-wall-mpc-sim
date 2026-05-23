@@ -28,7 +28,7 @@ describe('installStateLatticePolicyWorker', () => {
     expect(
       service.requestPolicy(createSimulationStateForScenario('spiral-known').environment, testOptions()),
     ).toBeNull()
-    expect(worker.postedMessages.map((message) => message.type)).toEqual(['build-policy'])
+    expect(worker.postedMessages.map((message) => message.type)).toEqual(['request-policy'])
   })
 
   it('falls back to the in-process policy service when no Worker factory is available', () => {

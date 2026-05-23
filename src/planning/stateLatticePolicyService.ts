@@ -37,6 +37,7 @@ export type StateLatticePolicyServiceStats = {
   hits: number
   misses: number
   backend: 'in-process' | 'worker'
+  lastError: string | null
 }
 
 export type StateLatticePolicyService = {
@@ -94,6 +95,7 @@ export function createInProcessStateLatticePolicyService(): StateLatticePolicySe
         hits: stats.hits,
         misses: stats.misses,
         backend: 'in-process',
+        lastError: null,
       }
     },
     clear() {
@@ -108,14 +110,23 @@ export function createWorkerStateLatticePolicyService(
 ): StateLatticePolicyService {
   const readyPolicies = new Map<string, StateLatticePolicy>()
   const pendingRequests = new Map<string, StateLatticePolicyRequest>()
+  const completedPolicies: StateLatticePolicy[] = []
   let hits = 0
   let misses = 0
+  let lastError: string | null = null
 
   const onMessage = (event: MessageEvent<StateLatticePolicyWorkerResponse>) => {
     const message = event.data
-    if (message.type !== 'policy-ready') return
-    readyPolicies.set(message.id, message.policy)
-    pendingRequests.delete(message.id)
+    if (message.type === 'policy-ready') {
+      readyPolicies.set(message.id, message.policy)
+      pendingRequests.delete(message.id)
+      completedPolicies.push(message.policy)
+      return
+    }
+    if (message.type === 'policy-error') {
+      lastError = message.message
+      if (message.id) pendingRequests.delete(message.id)
+    }
   }
   worker.addEventListener('message', onMessage)
 
@@ -130,21 +141,33 @@ export function createWorkerStateLatticePolicyService(
       if (!pendingRequests.has(request.id)) {
         misses += 1
         pendingRequests.set(request.id, request)
-        worker.postMessage({ type: 'build-policy', request })
+        worker.postMessage({ type: 'request-policy', request })
       }
       return null
     },
-    advancePendingBuilds() {
-      return []
+    advancePendingBuilds(workBudget = 4096) {
+      for (const request of pendingRequests.values()) {
+        worker.postMessage({ type: 'advance-policy-build', request, workBudget })
+      }
+      return completedPolicies.splice(0)
     },
     cacheStats() {
-      return { ready: readyPolicies.size, pending: pendingRequests.size, hits, misses, backend: 'worker' }
+      return {
+        ready: readyPolicies.size,
+        pending: pendingRequests.size,
+        hits,
+        misses,
+        backend: 'worker',
+        lastError,
+      }
     },
     clear() {
       readyPolicies.clear()
       pendingRequests.clear()
+      completedPolicies.splice(0)
       hits = 0
       misses = 0
+      lastError = null
       worker.postMessage({ type: 'clear-cache' })
     },
   }
@@ -187,6 +210,7 @@ export function handleStateLatticePolicyWorkerRequest(
           hits: stats.hits,
           misses: stats.misses,
           backend: 'worker',
+          lastError: null,
         },
       }
     }
@@ -199,13 +223,10 @@ export function handleStateLatticePolicyWorkerRequest(
       return policy ? { type: 'policy-ready', id: request.id, policy } : { type: 'policy-pending', id: request.id }
     }
 
-    let policy =
+    const policy =
       message.type === 'build-policy'
-        ? requestStateLatticePolicy(environment, options)
+        ? advanceStateLatticePolicyBuild(environment, options, message.workBudget ?? 4096)
         : advanceStateLatticePolicyBuild(environment, options, message.workBudget)
-    if (message.type === 'build-policy') {
-      while (!policy) policy = advanceStateLatticePolicyBuild(environment, options, message.workBudget ?? 4096)
-    }
     return policy ? { type: 'policy-ready', id: request.id, policy } : { type: 'policy-pending', id: request.id }
   } catch (error) {
     return {

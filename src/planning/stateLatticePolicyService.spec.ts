@@ -3,7 +3,10 @@ import { defaultParameters } from '../simulation/environment'
 import { createSimulationStateForScenario } from '../simulation/scenarios'
 import {
   createInProcessStateLatticePolicyService,
+  createWorkerStateLatticePolicyService,
   handleStateLatticePolicyWorkerRequest,
+  type StateLatticePolicyMessagePort,
+  type StateLatticePolicyWorkerResponse,
   serializeStateLatticePolicyRequest,
 } from './stateLatticePolicyService'
 
@@ -24,6 +27,7 @@ describe('state-lattice policy service', () => {
       hits: 0,
       misses: 1,
       backend: 'in-process',
+      lastError: null,
     })
   })
 
@@ -90,6 +94,52 @@ describe('state-lattice policy service', () => {
       stats: { ready: 1, pending: 0, backend: 'worker' },
     })
   })
+
+  it('worker service queues cold requests and advances pending builds in bounded chunks', () => {
+    const worker = new FakeStateLatticePolicyWorker()
+    const service = createWorkerStateLatticePolicyService(worker)
+    const state = createSimulationStateForScenario('spiral-known')
+    const options = testOptions()
+
+    expect(service.requestPolicy(state.environment, options)).toBeNull()
+    expect(worker.postedMessages.map((message) => message.type)).toEqual(['request-policy'])
+    expect(service.cacheStats()).toEqual({
+      ready: 0,
+      pending: 1,
+      hits: 0,
+      misses: 1,
+      backend: 'worker',
+      lastError: null,
+    })
+
+    expect(service.advancePendingBuilds(17)).toEqual([])
+    expect(worker.postedMessages.at(-1)).toMatchObject({ type: 'advance-policy-build', workBudget: 17 })
+
+    worker.emit({ type: 'policy-ready', id: worker.lastRequestId(), policy: handleReadyPolicy(state, options) })
+
+    expect(service.advancePendingBuilds(17)).toHaveLength(1)
+    expect(service.cacheStats()).toMatchObject({ ready: 1, pending: 0, hits: 0, misses: 1, backend: 'worker' })
+    expect(service.requestPolicy(state.environment, options)).not.toBeNull()
+    expect(service.cacheStats()).toMatchObject({ ready: 1, pending: 0, hits: 1, misses: 1 })
+  })
+
+  it('worker service exposes worker errors in stats and clears failed pending requests', () => {
+    const worker = new FakeStateLatticePolicyWorker()
+    const service = createWorkerStateLatticePolicyService(worker)
+    const state = createSimulationStateForScenario('spiral-known')
+
+    service.requestPolicy(state.environment, testOptions())
+    worker.emit({ type: 'policy-error', id: worker.lastRequestId(), message: 'worker failed' })
+
+    expect(service.cacheStats()).toEqual({
+      ready: 0,
+      pending: 0,
+      hits: 0,
+      misses: 1,
+      backend: 'worker',
+      lastError: 'worker failed',
+    })
+  })
 })
 
 function testOptions() {
@@ -99,5 +149,53 @@ function testOptions() {
     robotRadius: defaultParameters.robotRadius,
     discount: 0.98,
     iterations: 12,
+  }
+}
+
+function handleReadyPolicy(
+  state: ReturnType<typeof createSimulationStateForScenario>,
+  options: ReturnType<typeof testOptions>,
+) {
+  let response = handleStateLatticePolicyWorkerRequest({
+    type: 'advance-policy-build',
+    request: serializeStateLatticePolicyRequest(state.environment, options),
+    workBudget: 4096,
+  })
+  for (let i = 0; i < 2000 && response.type !== 'policy-ready'; i += 1) {
+    response = handleStateLatticePolicyWorkerRequest({
+      type: 'advance-policy-build',
+      request: serializeStateLatticePolicyRequest(state.environment, options),
+      workBudget: 4096,
+    })
+  }
+  if (response.type !== 'policy-ready') throw new Error('Expected test policy to complete')
+  return response.policy
+}
+
+class FakeStateLatticePolicyWorker implements StateLatticePolicyMessagePort {
+  readonly postedMessages: Parameters<StateLatticePolicyMessagePort['postMessage']>[0][] = []
+  private readonly listeners = new Set<(event: MessageEvent<StateLatticePolicyWorkerResponse>) => void>()
+
+  postMessage(message: Parameters<StateLatticePolicyMessagePort['postMessage']>[0]) {
+    this.postedMessages.push(message)
+    if (message.type === 'request-policy') this.emit({ type: 'policy-pending', id: message.request.id })
+  }
+
+  addEventListener(_type: 'message', listener: (event: MessageEvent<StateLatticePolicyWorkerResponse>) => void) {
+    this.listeners.add(listener)
+  }
+
+  removeEventListener(_type: 'message', listener: (event: MessageEvent<StateLatticePolicyWorkerResponse>) => void) {
+    this.listeners.delete(listener)
+  }
+
+  emit(message: StateLatticePolicyWorkerResponse) {
+    for (const listener of this.listeners) listener({ data: message } as MessageEvent<StateLatticePolicyWorkerResponse>)
+  }
+
+  lastRequestId() {
+    const message = this.postedMessages.findLast((candidate) => 'request' in candidate)
+    if (!message || !('request' in message)) throw new Error('Expected posted request')
+    return message.request.id
   }
 }

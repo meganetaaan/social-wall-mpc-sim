@@ -71,6 +71,7 @@ describe('policy mode planner selection', () => {
       hits: 0,
       misses: 1,
       backend: 'in-process',
+      lastError: null,
     })
   })
 
@@ -114,6 +115,7 @@ describe('policy mode planner selection', () => {
       hits: 1,
       misses: 1,
       backend: 'in-process',
+      lastError: null,
     })
   })
 
@@ -135,6 +137,7 @@ describe('policy mode planner selection', () => {
       hits: 0,
       misses: 0,
       backend: 'in-process',
+      lastError: null,
     })
   })
 
