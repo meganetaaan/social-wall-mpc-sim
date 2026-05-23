@@ -3,11 +3,16 @@ import { distance, nearestWall, normAngle, wallTangentAngle } from '../simulatio
 import type { ControlInput, PlannerMode, PlannerParameters, PlanningResult, SimulationState } from '../simulation/types'
 import { rolloutCandidate } from './rollout'
 import { planSamplingMpc } from './samplingMpc'
-import { getCachedStateLatticePolicy, lookupStateLatticeAction } from './stateLatticeValueIteration'
+import {
+  advanceStateLatticePolicyBuild,
+  lookupStateLatticeAction,
+  requestStateLatticePolicy,
+} from './stateLatticeValueIteration'
 
 export const defaultPlannerMode: PlannerMode = 'belief-mpc'
 
 const reactiveStopBuffer = 0.15
+const stateLatticeBuildWorkBudget = 4096
 
 export function planWithPolicy(args: {
   mode?: PlannerMode
@@ -24,7 +29,7 @@ export function planWithPolicy(args: {
 }
 
 function planStateLattice(state: SimulationState, parameters: PlannerParameters): PlanningResult {
-  const lattice = getCachedStateLatticePolicy(state.environment, {
+  const latticeOptions = {
     resolution: 0.4,
     headingBins: 16,
     robotRadius: parameters.robotRadius,
@@ -46,8 +51,13 @@ function planStateLattice(state: SimulationState, parameters: PlannerParameters)
         weight: human.vx === 0 && human.vy === 0 ? 1.5 : 0.7,
       })),
     ],
-  })
-  const control = lookupStateLatticeAction(lattice, state.robot) ?? { v: 0, omega: 0 }
+  }
+  const lattice = requestStateLatticePolicy(state.environment, latticeOptions)
+  if (!lattice) {
+    advanceStateLatticePolicyBuild(state.environment, latticeOptions, stateLatticeBuildWorkBudget)
+    return planBaseline(state, parameters, reactiveStopControl(state, parameters))
+  }
+  const control = lookupStateLatticeAction(lattice, state.robot) ?? reactiveStopControl(state, parameters)
   const selected = rolloutCandidate({
     robot: state.robot,
     humans: state.humans,

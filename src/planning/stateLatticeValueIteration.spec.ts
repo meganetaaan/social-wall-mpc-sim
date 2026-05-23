@@ -3,11 +3,13 @@ import { stepRobotInEnvironment } from '../simulation/dynamics'
 import { defaultParameters } from '../simulation/environment'
 import { createSimulationStateForScenario } from '../simulation/scenarios'
 import {
+  advanceStateLatticePolicyBuild,
   clearStateLatticePolicyCache,
   createStateLatticePolicy,
   getCachedStateLatticePolicy,
   lookupStateLatticeAction,
   lookupStateLatticeValue,
+  requestStateLatticePolicy,
   rolloutStateLatticePolicy,
   stateLatticePolicyCacheStats,
 } from './stateLatticeValueIteration'
@@ -28,7 +30,35 @@ describe('state-lattice value iteration', () => {
     const second = getCachedStateLatticePolicy(state.environment, options)
 
     expect(second).toBe(first)
-    expect(stateLatticePolicyCacheStats()).toEqual({ size: 1, hits: 1, misses: 1 })
+    expect(stateLatticePolicyCacheStats()).toEqual({ size: 1, pending: 0, hits: 1, misses: 1 })
+  })
+
+  it('stages policy construction without completing the cache on the first request', () => {
+    clearStateLatticePolicyCache()
+    const state = createSimulationStateForScenario('spiral-known')
+    const options = {
+      resolution: 0.4,
+      headingBins: 16,
+      robotRadius: defaultParameters.robotRadius,
+      discount: 0.98,
+      iterations: 12,
+    }
+
+    expect(requestStateLatticePolicy(state.environment, options)).toBeNull()
+    expect(stateLatticePolicyCacheStats()).toEqual({ size: 0, pending: 1, hits: 0, misses: 1 })
+
+    expect(advanceStateLatticePolicyBuild(state.environment, options, 8)).toBeNull()
+    expect(stateLatticePolicyCacheStats()).toEqual({ size: 0, pending: 1, hits: 0, misses: 1 })
+
+    let ready: ReturnType<typeof advanceStateLatticePolicyBuild> = null
+    for (let i = 0; i < 2000 && !ready; i += 1) {
+      ready = advanceStateLatticePolicyBuild(state.environment, options, 4096)
+    }
+
+    expect(ready).not.toBeNull()
+    expect(stateLatticePolicyCacheStats()).toEqual({ size: 1, pending: 0, hits: 0, misses: 1 })
+    expect(requestStateLatticePolicy(state.environment, options)).toBe(ready)
+    expect(stateLatticePolicyCacheStats()).toEqual({ size: 1, pending: 0, hits: 1, misses: 1 })
   })
 
   it('computes an orientation-aware policy table for a known spiral corridor', () => {

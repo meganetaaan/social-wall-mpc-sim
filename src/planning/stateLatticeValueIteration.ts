@@ -47,6 +47,18 @@ const defaultActions: StateLatticeAction[] = [
 let cacheHits = 0
 let cacheMisses = 0
 const policyCache = new Map<string, StateLatticePolicy>()
+const pendingBuilds = new Map<string, StateLatticePolicyBuild>()
+
+type StateLatticePolicyBuild = {
+  cacheKey: string
+  lattice: StateLatticePolicy
+  transitions: ReturnType<typeof buildTransitionTable>
+  discount: number
+  iterations: number
+  completedIterations: number
+  stateIndex: number
+  nextValues: Float64Array
+}
 
 export function getCachedStateLatticePolicy(
   environment: Environment,
@@ -65,20 +77,70 @@ export function getCachedStateLatticePolicy(
   return policy
 }
 
+export function requestStateLatticePolicy(
+  environment: Environment,
+  options: StateLatticePolicyOptions,
+): StateLatticePolicy | null {
+  const cacheKey = stateLatticePolicyCacheKey(environment, options)
+  const cached = policyCache.get(cacheKey)
+  if (cached) {
+    cacheHits += 1
+    return cached
+  }
+  cacheMisses += 1
+  if (!pendingBuilds.has(cacheKey))
+    pendingBuilds.set(cacheKey, createStateLatticePolicyBuild(environment, options, cacheKey))
+  return null
+}
+
+export function advanceStateLatticePolicyBuild(
+  environment: Environment,
+  options: StateLatticePolicyOptions,
+  workBudget = 2048,
+): StateLatticePolicy | null {
+  const cacheKey = stateLatticePolicyCacheKey(environment, options)
+  const cached = policyCache.get(cacheKey)
+  if (cached) return cached
+  let build = pendingBuilds.get(cacheKey)
+  if (!build) {
+    build = createStateLatticePolicyBuild(environment, options, cacheKey)
+    pendingBuilds.set(cacheKey, build)
+  }
+  const completed = advanceBuild(build, Math.max(1, Math.floor(workBudget)))
+  if (!completed) return null
+  completed.cacheKey = cacheKey
+  pendingBuilds.delete(cacheKey)
+  policyCache.set(cacheKey, completed)
+  return completed
+}
+
 export function clearStateLatticePolicyCache() {
   policyCache.clear()
+  pendingBuilds.clear()
   cacheHits = 0
   cacheMisses = 0
 }
 
 export function stateLatticePolicyCacheStats() {
-  return { size: policyCache.size, hits: cacheHits, misses: cacheMisses }
+  return { size: policyCache.size, pending: pendingBuilds.size, hits: cacheHits, misses: cacheMisses }
 }
 
 export function createStateLatticePolicy(
   environment: Environment,
   options: StateLatticePolicyOptions,
 ): StateLatticePolicy {
+  const build = createStateLatticePolicyBuild(environment, options)
+  while (!advanceBuild(build, build.lattice.values.length)) {
+    // Advance whole sweeps for direct/offline construction.
+  }
+  return build.lattice
+}
+
+function createStateLatticePolicyBuild(
+  environment: Environment,
+  options: StateLatticePolicyOptions,
+  cacheKey?: string,
+): StateLatticePolicyBuild {
   const resolution = options.resolution
   const headingBins = Math.max(4, Math.floor(options.headingBins))
   const padding = options.padding ?? resolution * 2
@@ -135,13 +197,27 @@ export function createStateLatticePolicy(
   )
   const discount = options.discount ?? 0.98
   const iterations = Math.max(1, Math.floor(options.iterations ?? 64))
-  for (let iteration = 0; iteration < iterations; iteration += 1) {
-    const nextValues = new Float64Array(values)
-    for (let stateIndex = 0; stateIndex < stateCount; stateIndex += 1) {
-      if (values[stateIndex] === 0) {
-        policy[stateIndex] = -1
-        continue
-      }
+  return {
+    cacheKey: cacheKey ?? '',
+    lattice,
+    transitions,
+    discount,
+    iterations,
+    completedIterations: 0,
+    stateIndex: 0,
+    nextValues: new Float64Array(values),
+  }
+}
+
+function advanceBuild(build: StateLatticePolicyBuild, workBudget: number): StateLatticePolicy | null {
+  const { lattice, transitions, discount, iterations } = build
+  const { actions, policy, unreachableCost, values } = lattice
+  let remaining = workBudget
+  while (remaining > 0 && build.completedIterations < iterations) {
+    const stateIndex = build.stateIndex
+    if (values[stateIndex] === 0) {
+      policy[stateIndex] = -1
+    } else {
       let bestCost = values[stateIndex]
       let bestAction = policy[stateIndex]
       for (let actionIndex = 0; actionIndex < actions.length; actionIndex += 1) {
@@ -156,12 +232,20 @@ export function createStateLatticePolicy(
           bestAction = actionIndex
         }
       }
-      nextValues[stateIndex] = bestCost
+      build.nextValues[stateIndex] = bestCost
       policy[stateIndex] = bestAction
     }
-    values.set(nextValues)
+
+    remaining -= 1
+    build.stateIndex += 1
+    if (build.stateIndex < values.length) continue
+
+    values.set(build.nextValues)
+    build.completedIterations += 1
+    build.stateIndex = 0
+    if (build.completedIterations < iterations) build.nextValues = new Float64Array(values)
   }
-  return lattice
+  return build.completedIterations >= iterations ? lattice : null
 }
 
 export function lookupStateLatticeAction(lattice: StateLatticePolicy, state: RobotState): StateLatticeAction | null {

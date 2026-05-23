@@ -5,6 +5,9 @@ The experimental `state-lattice` planner now builds an orientation-aware value a
 a single-control rollout for UI consistency with the existing planner result shape. The lattice policy
 is cached by deterministic environment geometry, goal, grid, action primitive, iteration, and social-risk
 parameters so unchanged known-map calls reuse the precomputed field instead of rebuilding every frame.
+Cold `state-lattice` planner calls now request a staged policy build and return a cheap safe fallback while
+bounded value-iteration work advances in later calls. Once the staged build completes, the cached policy is
+used for single-control policy lookup instead of rebuilding synchronously inside the simulation step.
 
 The default primitive set is deliberately small but no longer limited to one forward arc pair: it includes
 slow and fast forward motion, small and large left/right arcs, and reverse variants. Static social risk can

@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { defaultParameters } from '../simulation/environment'
 import { createSimulationStateForScenario } from '../simulation/scenarios'
 import { defaultPlannerMode, planWithPolicy } from './policies'
-import { clearStateLatticePolicyCache, stateLatticePolicyCacheStats } from './stateLatticeValueIteration'
+import {
+  clearStateLatticePolicyCache,
+  getCachedStateLatticePolicy,
+  lookupStateLatticeAction,
+  stateLatticePolicyCacheStats,
+} from './stateLatticeValueIteration'
 
 describe('policy mode planner selection', () => {
   it('preserves belief MPC as the default policy mode', () => {
@@ -43,9 +48,48 @@ describe('policy mode planner selection', () => {
     expect(result.bestControl.v).toBeGreaterThan(0)
   })
 
-  it('state-lattice mode uses an orientation-aware policy lookup instead of sampling MPC', () => {
+  it('state-lattice mode starts a staged build and uses fallback on a cold cache', () => {
     clearStateLatticePolicyCache()
     const state = createSimulationStateForScenario('spiral-known')
+    const start = performance.now()
+
+    const result = planWithPolicy({
+      mode: 'state-lattice',
+      state,
+      parameters: defaultParameters,
+      seed: 4,
+    })
+    const elapsedMs = performance.now() - start
+
+    expect(result.bestControl.v).toBeGreaterThan(0)
+    expect(result.candidates).toHaveLength(1)
+    expect(result.selected.controls).toHaveLength(defaultParameters.horizonSteps)
+    expect(elapsedMs).toBeLessThan(1000)
+    expect(stateLatticePolicyCacheStats()).toEqual({ size: 0, pending: 1, hits: 0, misses: 1 })
+  })
+
+  it('state-lattice mode completes a staged build across repeated calls and then hits cache', () => {
+    clearStateLatticePolicyCache()
+    const state = createSimulationStateForScenario('spiral-known')
+
+    for (let i = 0; i < 1000 && stateLatticePolicyCacheStats().size === 0; i += 1) {
+      planWithPolicy({ mode: 'state-lattice', state, parameters: defaultParameters, seed: 4 + i })
+    }
+
+    expect(stateLatticePolicyCacheStats().size).toBe(1)
+    const result = planWithPolicy({ mode: 'state-lattice', state, parameters: defaultParameters, seed: 5000 })
+
+    expect(result.candidates).toHaveLength(1)
+    expect(result.selected.controls).toHaveLength(1)
+    expect(stateLatticePolicyCacheStats()).toMatchObject({ size: 1, pending: 0, hits: 1 })
+  })
+
+  it('state-lattice mode uses a ready policy lookup with a single-control rollout', () => {
+    clearStateLatticePolicyCache()
+    const state = createSimulationStateForScenario('spiral-known')
+    const options = stateLatticeOptionsForState(state, defaultParameters.robotRadius)
+    const policy = getCachedStateLatticePolicy(state.environment, options)
+    const action = lookupStateLatticeAction(policy, state.robot)
 
     const result = planWithPolicy({
       mode: 'state-lattice',
@@ -54,19 +98,37 @@ describe('policy mode planner selection', () => {
       seed: 4,
     })
 
-    expect(result.bestControl.v).toBeGreaterThan(0)
+    expect(action).not.toBeNull()
     expect(result.candidates).toHaveLength(1)
     expect(result.selected.controls).toHaveLength(1)
-    expect(stateLatticePolicyCacheStats()).toEqual({ size: 1, hits: 0, misses: 1 })
-  })
-
-  it('state-lattice mode reuses the precomputed value policy across unchanged planning calls', () => {
-    clearStateLatticePolicyCache()
-    const state = createSimulationStateForScenario('spiral-known')
-
-    planWithPolicy({ mode: 'state-lattice', state, parameters: defaultParameters, seed: 4 })
-    planWithPolicy({ mode: 'state-lattice', state, parameters: defaultParameters, seed: 5 })
-
-    expect(stateLatticePolicyCacheStats()).toEqual({ size: 1, hits: 1, misses: 1 })
+    expect(result.bestControl.v).toBeCloseTo(action?.v ?? Number.NaN)
+    expect(result.bestControl.omega).toBeCloseTo(action?.omega ?? Number.NaN)
+    expect(stateLatticePolicyCacheStats()).toEqual({ size: 1, pending: 0, hits: 1, misses: 1 })
   })
 })
+
+function stateLatticeOptionsForState(state: ReturnType<typeof createSimulationStateForScenario>, robotRadius: number) {
+  return {
+    resolution: 0.4,
+    headingBins: 16,
+    robotRadius,
+    discount: 0.98,
+    iterations: 180,
+    socialRisks: [
+      ...(state.belief.objectBeliefs ?? []).map((object) => ({
+        id: object.id,
+        x: object.centroid.x,
+        y: object.centroid.y,
+        radius: object.radius,
+        weight: 1 + object.pHuman + object.pStatic,
+      })),
+      ...state.humans.map((human) => ({
+        id: human.id,
+        x: human.x,
+        y: human.y,
+        radius: human.radius,
+        weight: human.vx === 0 && human.vy === 0 ? 1.5 : 0.7,
+      })),
+    ],
+  }
+}
