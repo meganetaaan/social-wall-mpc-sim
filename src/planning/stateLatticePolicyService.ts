@@ -46,7 +46,7 @@ export type StateLatticePolicyService = {
   clear(): void
 }
 
-type StateLatticePolicyMessagePort = {
+export type StateLatticePolicyMessagePort = {
   postMessage(message: StateLatticePolicyWorkerRequest): void
   addEventListener(type: 'message', listener: (event: MessageEvent<StateLatticePolicyWorkerResponse>) => void): void
   removeEventListener(type: 'message', listener: (event: MessageEvent<StateLatticePolicyWorkerResponse>) => void): void

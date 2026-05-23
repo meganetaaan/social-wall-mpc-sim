@@ -9,8 +9,9 @@ Cold `state-lattice` planner calls now request policy work through a small servi
 cheap safe fallback while bounded value-iteration work advances outside the planner call. Once the staged
 build completes, the cached policy is used for single-control policy lookup instead of rebuilding
 synchronously inside the simulation step. The same service exposes a worker-safe request/response protocol
-and worker handler so policy construction can be hosted off the UI thread; the default test/runtime adapter
-remains deterministic and in-process until a browser worker instance is explicitly installed.
+and worker handler so policy construction can be hosted off the UI thread. Browser bootstrap now installs
+the Vite module Worker when Worker construction is available, and falls back silently to the deterministic
+in-process service for tests, SSR, and non-browser execution.
 
 The runtime lattice source now goes through belief-derived map selection before policy construction. Known-map
 beliefs with broad high-confidence true-ID coverage continue to use the full scenario environment. Unknown-map
@@ -31,8 +32,8 @@ Remaining gaps versus Ueda et al. are substantial:
   risk centers for the cached policy key.
 - Belief-derived lattice maps are still hard geometry once admitted; uncertainty is only used for source
   gating, not represented inside the value table.
-- The default runtime adapter is still in-process; a browser worker protocol/handler exists, but UI bootstrap
-  does not yet install a real Worker by default.
+- Browser bootstrap installs a Worker-backed service when available, but non-browser runs and Worker
+  construction failures still use the in-process service.
 - The browser implementation is CPU TypeScript and should move heavier policy construction to the Worker
   adapter, WASM, or GPU path before using finer grids or larger maps interactively.
 - The spiral known-map regression now covers a long policy-driven route through multiple bends, but exact
