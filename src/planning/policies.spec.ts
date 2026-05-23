@@ -105,6 +105,57 @@ describe('policy mode planner selection', () => {
     expect(result.bestControl.omega).toBeCloseTo(action?.omega ?? Number.NaN)
     expect(stateLatticePolicyCacheStats()).toEqual({ size: 1, pending: 0, hits: 1, misses: 1 })
   })
+
+  it('state-lattice mode falls back on an unknown sparse map without starting a misleading build', () => {
+    clearStateLatticePolicyCache()
+    const state = createSimulationStateForScenario('spiral-unknown')
+
+    const result = planWithPolicy({
+      mode: 'state-lattice',
+      state,
+      parameters: defaultParameters,
+      seed: 4,
+    })
+
+    expect(result.candidates).toHaveLength(1)
+    expect(result.selected.controls).toHaveLength(defaultParameters.horizonSteps)
+    expect(stateLatticePolicyCacheStats()).toEqual({ size: 0, pending: 0, hits: 0, misses: 0 })
+  })
+
+  it('state-lattice mode builds and caches from reliable anonymous map features', () => {
+    clearStateLatticePolicyCache()
+    const state = createSimulationStateForScenario('spiral-unknown')
+    const featureState = {
+      ...state,
+      belief: {
+        ...state.belief,
+        estimatedFeatures: state.environment.walls.map((wall, index) => ({
+          id: `feature-${index}`,
+          a: wall.a,
+          b: wall.b,
+          confidence: 0.86,
+          observationCount: 4,
+          lastObservedAt: 3,
+        })),
+      },
+    }
+
+    for (let i = 0; i < 1000 && stateLatticePolicyCacheStats().size === 0; i += 1) {
+      planWithPolicy({ mode: 'state-lattice', state: featureState, parameters: defaultParameters, seed: 4 + i })
+    }
+
+    expect(stateLatticePolicyCacheStats().size).toBe(1)
+    const result = planWithPolicy({
+      mode: 'state-lattice',
+      state: featureState,
+      parameters: defaultParameters,
+      seed: 5000,
+    })
+
+    expect(result.candidates).toHaveLength(1)
+    expect(result.selected.controls).toHaveLength(1)
+    expect(stateLatticePolicyCacheStats()).toMatchObject({ size: 1, pending: 0, hits: 1 })
+  })
 })
 
 function stateLatticeOptionsForState(state: ReturnType<typeof createSimulationStateForScenario>, robotRadius: number) {

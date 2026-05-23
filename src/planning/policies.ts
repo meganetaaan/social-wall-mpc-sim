@@ -1,6 +1,7 @@
 import { clampControl } from '../simulation/dynamics'
 import { distance, nearestWall, normAngle, wallTangentAngle } from '../simulation/math'
 import type { ControlInput, PlannerMode, PlannerParameters, PlanningResult, SimulationState } from '../simulation/types'
+import { selectBeliefLatticeSource } from './beliefLatticeSource'
 import { rolloutCandidate } from './rollout'
 import { planSamplingMpc } from './samplingMpc'
 import {
@@ -52,9 +53,12 @@ function planStateLattice(state: SimulationState, parameters: PlannerParameters)
       })),
     ],
   }
-  const lattice = requestStateLatticePolicy(state.environment, latticeOptions)
+  const latticeSource = selectBeliefLatticeSource(state.environment, state.belief)
+  if (latticeSource.status !== 'ready') return planBaseline(state, parameters, reactiveStopControl(state, parameters))
+  const latticeEnvironment = latticeSource.environment
+  const lattice = requestStateLatticePolicy(latticeEnvironment, latticeOptions)
   if (!lattice) {
-    advanceStateLatticePolicyBuild(state.environment, latticeOptions, stateLatticeBuildWorkBudget)
+    advanceStateLatticePolicyBuild(latticeEnvironment, latticeOptions, stateLatticeBuildWorkBudget)
     return planBaseline(state, parameters, reactiveStopControl(state, parameters))
   }
   const control = lookupStateLatticeAction(lattice, state.robot) ?? reactiveStopControl(state, parameters)
