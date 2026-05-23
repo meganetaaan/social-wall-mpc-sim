@@ -3,7 +3,7 @@ import { distance, nearestWall, normAngle, wallTangentAngle } from '../simulatio
 import type { ControlInput, PlannerMode, PlannerParameters, PlanningResult, SimulationState } from '../simulation/types'
 import { rolloutCandidate } from './rollout'
 import { planSamplingMpc } from './samplingMpc'
-import { createStateLatticePolicy, lookupStateLatticeAction } from './stateLatticeValueIteration'
+import { getCachedStateLatticePolicy, lookupStateLatticeAction } from './stateLatticeValueIteration'
 
 export const defaultPlannerMode: PlannerMode = 'belief-mpc'
 
@@ -24,12 +24,28 @@ export function planWithPolicy(args: {
 }
 
 function planStateLattice(state: SimulationState, parameters: PlannerParameters): PlanningResult {
-  const lattice = createStateLatticePolicy(state.environment, {
+  const lattice = getCachedStateLatticePolicy(state.environment, {
     resolution: 0.4,
     headingBins: 16,
     robotRadius: parameters.robotRadius,
     discount: 0.98,
     iterations: 180,
+    socialRisks: [
+      ...(state.belief.objectBeliefs ?? []).map((object) => ({
+        id: object.id,
+        x: object.centroid.x,
+        y: object.centroid.y,
+        radius: object.radius,
+        weight: 1 + object.pHuman + object.pStatic,
+      })),
+      ...state.humans.map((human) => ({
+        id: human.id,
+        x: human.x,
+        y: human.y,
+        radius: human.radius,
+        weight: human.vx === 0 && human.vy === 0 ? 1.5 : 0.7,
+      })),
+    ],
   })
   const control = lookupStateLatticeAction(lattice, state.robot) ?? { v: 0, omega: 0 }
   const selected = rolloutCandidate({

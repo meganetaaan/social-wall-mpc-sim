@@ -3,6 +3,7 @@ import { distance, nearestWall, normAngle } from '../simulation/math'
 import type { ControlInput, Environment, PlannerParameters, RobotState, Vec2 } from '../simulation/types'
 
 export type StateLatticeAction = ControlInput & { id: string }
+export type StateLatticeSocialRisk = Vec2 & { id?: string; radius: number; weight?: number }
 
 export type StateLatticePolicyOptions = {
   resolution: number
@@ -14,6 +15,7 @@ export type StateLatticePolicyOptions = {
   iterations?: number
   padding?: number
   unreachableCost?: number
+  socialRisks?: StateLatticeSocialRisk[]
 }
 
 export type StateLatticePolicy = {
@@ -27,14 +29,51 @@ export type StateLatticePolicy = {
   policy: Int16Array
   unreachableCost: number
   actionDuration: number
+  cacheKey?: string
 }
 
 const defaultActions: StateLatticeAction[] = [
-  { id: 'forward', v: 0.45, omega: 0 },
-  { id: 'forward-left', v: 0.34, omega: 0.85 },
-  { id: 'forward-right', v: 0.34, omega: -0.85 },
+  { id: 'forward-fast', v: 0.5, omega: 0 },
+  { id: 'forward-slow', v: 0.3, omega: 0 },
+  { id: 'forward-left-small', v: 0.42, omega: 0.45 },
+  { id: 'forward-right-small', v: 0.42, omega: -0.45 },
+  { id: 'forward-left-large', v: 0.32, omega: 1.05 },
+  { id: 'forward-right-large', v: 0.32, omega: -1.05 },
   { id: 'reverse', v: -0.18, omega: 0 },
+  { id: 'reverse-left', v: -0.16, omega: 0.75 },
+  { id: 'reverse-right', v: -0.16, omega: -0.75 },
 ]
+
+let cacheHits = 0
+let cacheMisses = 0
+const policyCache = new Map<string, StateLatticePolicy>()
+
+export function getCachedStateLatticePolicy(
+  environment: Environment,
+  options: StateLatticePolicyOptions,
+): StateLatticePolicy {
+  const cacheKey = stateLatticePolicyCacheKey(environment, options)
+  const cached = policyCache.get(cacheKey)
+  if (cached) {
+    cacheHits += 1
+    return cached
+  }
+  cacheMisses += 1
+  const policy = createStateLatticePolicy(environment, options)
+  policy.cacheKey = cacheKey
+  policyCache.set(cacheKey, policy)
+  return policy
+}
+
+export function clearStateLatticePolicyCache() {
+  policyCache.clear()
+  cacheHits = 0
+  cacheMisses = 0
+}
+
+export function stateLatticePolicyCacheStats() {
+  return { size: policyCache.size, hits: cacheHits, misses: cacheMisses }
+}
 
 export function createStateLatticePolicy(
   environment: Environment,
@@ -87,7 +126,13 @@ export function createStateLatticePolicy(
     }
   }
 
-  const transitions = buildTransitionTable(lattice, environment, blocked, options.robotRadius)
+  const transitions = buildTransitionTable(
+    lattice,
+    environment,
+    blocked,
+    options.robotRadius,
+    options.socialRisks ?? [],
+  )
   const discount = options.discount ?? 0.98
   const iterations = Math.max(1, Math.floor(options.iterations ?? 64))
   for (let iteration = 0; iteration < iterations; iteration += 1) {
@@ -124,8 +169,16 @@ export function lookupStateLatticeAction(lattice: StateLatticePolicy, state: Rob
   const y = Math.round((state.y - lattice.origin.y) / lattice.resolution)
   if (x < 0 || y < 0 || x >= lattice.width || y >= lattice.height) return null
   const h = headingBin(state.theta, lattice.headingBins)
-  const actionIndex = lattice.policy[toStateIndex(lattice, x, y, h)]
+  const actionIndex = nearestPolicyActionIndex(lattice, x, y, h)
   return actionIndex >= 0 ? lattice.actions[actionIndex] : null
+}
+
+export function lookupStateLatticeValue(lattice: StateLatticePolicy, state: RobotState): number {
+  const x = Math.round((state.x - lattice.origin.x) / lattice.resolution)
+  const y = Math.round((state.y - lattice.origin.y) / lattice.resolution)
+  if (x < 0 || y < 0 || x >= lattice.width || y >= lattice.height) return lattice.unreachableCost
+  const h = headingBin(state.theta, lattice.headingBins)
+  return lattice.values[toStateIndex(lattice, x, y, h)]
 }
 
 export function rolloutStateLatticePolicy(args: {
@@ -153,6 +206,7 @@ function buildTransitionTable(
   environment: Environment,
   blocked: Uint8Array,
   robotRadius: number,
+  socialRisks: StateLatticeSocialRisk[],
 ) {
   const transitionCount = lattice.values.length * lattice.actions.length
   const nextState = new Int32Array(transitionCount)
@@ -175,7 +229,9 @@ function buildTransitionTable(
           if (distance(state, stepped) < lattice.resolution * 0.15 && Math.abs(action.omega) < 0.01) continue
           const nh = headingBin(stepped.theta, lattice.headingBins)
           nextState[transitionOffset] = toStateIndex(lattice, nx, ny, nh)
-          stageCost[transitionOffset] = actionStageCost(action, lattice.actionDuration)
+          stageCost[transitionOffset] =
+            actionStageCost(action, lattice.actionDuration) +
+            socialRiskStageCost(stepped, socialRisks, robotRadius, lattice.actionDuration)
         }
       }
     }
@@ -190,9 +246,58 @@ function actionStageCost(action: ControlInput, duration: number) {
   return distanceCost + turnCost + reverseCost
 }
 
+function socialRiskStageCost(
+  point: Vec2,
+  socialRisks: StateLatticeSocialRisk[],
+  robotRadius: number,
+  duration: number,
+) {
+  return socialRisks.reduce((total, risk) => {
+    const preferredClearance = risk.radius + robotRadius + 0.55
+    const clearanceDeficit = Math.max(0, preferredClearance - distance(point, risk))
+    return total + (risk.weight ?? 1) * duration * clearanceDeficit * clearanceDeficit
+  }, 0)
+}
+
 function isBlocked(point: Vec2, environment: Environment, robotRadius: number) {
   if (environment.walls.length > 0 && nearestWall(point, environment.walls).distance < robotRadius) return true
   return environment.obstacles.some((obstacle) => distance(point, obstacle) <= obstacle.radius + robotRadius)
+}
+
+function stateLatticePolicyCacheKey(environment: Environment, options: StateLatticePolicyOptions) {
+  const actions = options.actions ?? defaultActions
+  return [
+    `r=${rounded(options.resolution)}`,
+    `h=${Math.max(4, Math.floor(options.headingBins))}`,
+    `rr=${rounded(options.robotRadius)}`,
+    `dt=${rounded(options.actionDuration ?? 1)}`,
+    `d=${rounded(options.discount ?? 0.98)}`,
+    `i=${Math.max(1, Math.floor(options.iterations ?? 64))}`,
+    `p=${rounded(options.padding ?? options.resolution * 2)}`,
+    `u=${rounded(options.unreachableCost ?? 1_000_000)}`,
+    `g=${pointKey(environment.goal)}:${rounded(environment.goalRadius ?? options.resolution)}`,
+    `walls=${environment.walls
+      .map((wall) => `${wall.id}:${pointKey(wall.a)}-${pointKey(wall.b)}`)
+      .sort()
+      .join('|')}`,
+    `obstacles=${environment.obstacles
+      .map((obstacle) => `${obstacle.id}:${pointKey(obstacle)}:${rounded(obstacle.radius)}`)
+      .sort()
+      .join('|')}`,
+    `actions=${actions.map((action) => `${action.id}:${rounded(action.v)}:${rounded(action.omega)}`).join('|')}`,
+    `social=${(options.socialRisks ?? [])
+      .map((risk) => `${risk.id ?? ''}:${pointKey(risk)}:${rounded(risk.radius)}:${rounded(risk.weight ?? 1)}`)
+      .sort()
+      .join('|')}`,
+  ].join(';')
+}
+
+function pointKey(point: Vec2) {
+  return `${rounded(point.x)},${rounded(point.y)}`
+}
+
+function rounded(value: number) {
+  return Math.round(value * 1000) / 1000
 }
 
 function cellCenter(lattice: Pick<StateLatticePolicy, 'origin' | 'resolution'>, x: number, y: number): Vec2 {
@@ -210,6 +315,34 @@ function toStateIndex(
   h: number,
 ) {
   return (h * lattice.height + y) * lattice.width + x
+}
+
+function nearestPolicyActionIndex(lattice: StateLatticePolicy, x: number, y: number, h: number) {
+  const exact = lattice.policy[toStateIndex(lattice, x, y, h)]
+  if (exact >= 0) return exact
+  let best: { actionIndex: number; value: number; offset: number } | null = null
+  for (let dh = -1; dh <= 1; dh += 1) {
+    const heading = (h + dh + lattice.headingBins) % lattice.headingBins
+    for (let radius = 1; radius <= 2; radius += 1) {
+      for (let dy = -radius; dy <= radius; dy += 1) {
+        for (let dx = -radius; dx <= radius; dx += 1) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue
+          const nx = x + dx
+          const ny = y + dy
+          if (nx < 0 || ny < 0 || nx >= lattice.width || ny >= lattice.height) continue
+          const stateIndex = toStateIndex(lattice, nx, ny, heading)
+          const actionIndex = lattice.policy[stateIndex]
+          if (actionIndex < 0) continue
+          const value = lattice.values[stateIndex]
+          const offset = Math.abs(dx) + Math.abs(dy) + Math.abs(dh)
+          if (!best || value < best.value || (value === best.value && offset < best.offset)) {
+            best = { actionIndex, value, offset }
+          }
+        }
+      }
+    }
+  }
+  return best?.actionIndex ?? -1
 }
 
 function headingForBin(h: number, headingBins: number) {
