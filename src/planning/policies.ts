@@ -39,6 +39,8 @@ function planStateLattice(state: SimulationState, parameters: PlannerParameters)
         y: object.centroid.y,
         radius: object.radius,
         weight: 1 + object.pHuman + object.pStatic,
+        vx: object.velocity.x,
+        vy: object.velocity.y,
       })),
       ...state.humans.map((human) => ({
         id: human.id,
@@ -46,6 +48,8 @@ function planStateLattice(state: SimulationState, parameters: PlannerParameters)
         y: human.y,
         radius: human.radius,
         weight: human.vx === 0 && human.vy === 0 ? 1.5 : 0.7,
+        vx: human.vx,
+        vy: human.vy,
       })),
     ],
   }

@@ -2,8 +2,17 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { defaultParameters } from '../simulation/environment'
 import { createSimulationStateForScenario } from '../simulation/scenarios'
 import { defaultPlannerMode, planWithPolicy } from './policies'
-import { getStateLatticePolicyService, resetStateLatticePolicyService } from './stateLatticePolicyService'
-import { getCachedStateLatticePolicy, lookupStateLatticeAction } from './stateLatticeValueIteration'
+import {
+  getStateLatticePolicyService,
+  resetStateLatticePolicyService,
+  type StateLatticePolicyService,
+  setStateLatticePolicyService,
+} from './stateLatticePolicyService'
+import {
+  getCachedStateLatticePolicy,
+  lookupStateLatticeAction,
+  type StateLatticePolicyOptions,
+} from './stateLatticeValueIteration'
 
 describe('policy mode planner selection', () => {
   beforeEach(() => {
@@ -175,6 +184,27 @@ describe('policy mode planner selection', () => {
     expect(result.selected.controls).toHaveLength(1)
     expect(getStateLatticePolicyService().cacheStats()).toMatchObject({ ready: 1, pending: 0, hits: 1 })
   })
+
+  it('state-lattice mode passes moving humans into social-risk options', () => {
+    const service = new CapturingPolicyService()
+    setStateLatticePolicyService(service)
+    const state = {
+      ...createSimulationStateForScenario('spiral-known'),
+      humans: [{ id: 'walker', x: 1.2, y: 0.8, vx: 0.3, vy: -0.4, radius: 0.22 }],
+    }
+
+    planWithPolicy({ mode: 'state-lattice', state, parameters: defaultParameters, seed: 4 })
+
+    expect(service.lastOptions?.socialRisks).toContainEqual({
+      id: 'walker',
+      x: 1.2,
+      y: 0.8,
+      radius: 0.22,
+      weight: 0.7,
+      vx: 0.3,
+      vy: -0.4,
+    })
+  })
 })
 
 function stateLatticeOptionsForState(state: ReturnType<typeof createSimulationStateForScenario>, robotRadius: number) {
@@ -191,6 +221,8 @@ function stateLatticeOptionsForState(state: ReturnType<typeof createSimulationSt
         y: object.centroid.y,
         radius: object.radius,
         weight: 1 + object.pHuman + object.pStatic,
+        vx: object.velocity.x,
+        vy: object.velocity.y,
       })),
       ...state.humans.map((human) => ({
         id: human.id,
@@ -198,7 +230,33 @@ function stateLatticeOptionsForState(state: ReturnType<typeof createSimulationSt
         y: human.y,
         radius: human.radius,
         weight: human.vx === 0 && human.vy === 0 ? 1.5 : 0.7,
+        vx: human.vx,
+        vy: human.vy,
       })),
     ],
+  }
+}
+
+class CapturingPolicyService implements StateLatticePolicyService {
+  lastOptions: StateLatticePolicyOptions | null = null
+
+  requestPolicy(
+    _environment: Parameters<StateLatticePolicyService['requestPolicy']>[0],
+    options: StateLatticePolicyOptions,
+  ) {
+    this.lastOptions = options
+    return null
+  }
+
+  advancePendingBuilds() {
+    return []
+  }
+
+  cacheStats() {
+    return { ready: 0, pending: 0, hits: 0, misses: 0, backend: 'in-process' as const, lastError: null }
+  }
+
+  clear() {
+    this.lastOptions = null
   }
 }

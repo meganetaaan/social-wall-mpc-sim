@@ -153,4 +153,34 @@ describe('state-lattice value iteration', () => {
 
     expect(lookupStateLatticeValue(withRisk, probe)).toBeGreaterThan(lookupStateLatticeValue(baseline, probe))
   })
+
+  it('changes policy when a moving risk crosses a primitive path later in the transition', () => {
+    const environment = { walls: [], obstacles: [], goal: { x: 2, y: 0 }, goalRadius: 0.35 }
+    const options = {
+      resolution: 0.5,
+      headingBins: 8,
+      robotRadius: 0.2,
+      actionDuration: 1,
+      discount: 0.96,
+      iterations: 32,
+      padding: 2,
+      actions: [
+        { id: 'forward', v: 1, omega: 0 },
+        { id: 'turn-left', v: 0.5, omega: Math.PI / 2 },
+        { id: 'turn-right', v: 0.5, omega: -Math.PI / 2 },
+      ],
+    }
+    const probe = { x: 0, y: 0, theta: 0 }
+    const nonCrossing = createStateLatticePolicy(environment, {
+      ...options,
+      socialRisks: [{ id: 'crossing-human', x: 1, y: -1, radius: 0.25, weight: 25, vx: 0, vy: 0 }],
+    })
+    const crossing = createStateLatticePolicy(environment, {
+      ...options,
+      socialRisks: [{ id: 'crossing-human', x: 1, y: -1, radius: 0.25, weight: 25, vx: 0, vy: 1 }],
+    })
+
+    expect(lookupStateLatticeAction(nonCrossing, probe)?.id).toBe('forward')
+    expect(lookupStateLatticeAction(crossing, probe)?.id).not.toBe('forward')
+  })
 })

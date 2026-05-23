@@ -33,15 +33,18 @@ skip staged policy construction, so `state-lattice` keeps using the safe baselin
 Reliable partial true-ID wall estimates can still produce a lattice source when anonymous features are absent.
 
 The default primitive set is deliberately small but no longer limited to one forward arc pair: it includes
-slow and fast forward motion, small and large left/right arcs, and reverse variants. Static social risk can
-enter the value backup through generic risk centers from object beliefs or current humans, so a risky cell
-has higher value before rollout scoring is considered.
+slow and fast forward motion, small and large left/right arcs, and reverse variants. Social risk can enter
+the value backup through generic risk centers from object beliefs or current humans, so a risky cell has
+higher value before rollout scoring is considered. Risk centers may also carry velocity and optional
+temporal radius uncertainty; transition cost samples each primitive and evaluates the risk center predicted
+at that sample's time offset. This lets the cached `V(x, y, theta)` policy distinguish a moving human that
+will cross a future primitive path from the same human frozen at the current pose.
 
 Remaining gaps versus Ueda et al. are substantial:
 
 - The table is still `V(x, y, theta)`, not a belief-space `V(b)` over pose/map/object distributions.
-- Dynamic human motion is not propagated through the Bellman backup; current humans are treated as static
-  risk centers for the cached policy key.
+- Dynamic human motion is represented only as deterministic linear risk-center prediction over each action
+  primitive, not as a full belief distribution over future human trajectories.
 - Belief-derived lattice maps are still hard geometry once admitted; uncertainty is only used for source
   gating, not represented inside the value table.
 - Browser bootstrap installs a Worker-backed service when available, but non-browser runs and Worker

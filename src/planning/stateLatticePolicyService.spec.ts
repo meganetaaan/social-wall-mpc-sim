@@ -63,6 +63,27 @@ describe('state-lattice policy service', () => {
     expect(request.options).toEqual(options)
   })
 
+  it('serializes social-risk velocity through deterministic request ids and worker protocol', () => {
+    const state = createSimulationStateForScenario('spiral-known')
+    const options = {
+      ...testOptions(),
+      socialRisks: [{ id: 'moving-human', x: 1.2, y: 2.3, radius: 0.24, weight: 3, vx: 0.4, vy: -0.2 }],
+    }
+    const request = serializeStateLatticePolicyRequest(state.environment, options)
+    const reordered = serializeStateLatticePolicyRequest(state.environment, {
+      ...options,
+      socialRisks: [{ vy: -0.2, vx: 0.4, weight: 3, radius: 0.24, y: 2.3, x: 1.2, id: 'moving-human' }],
+    })
+
+    expect(request.id).toBe(reordered.id)
+    expect(request.options.socialRisks).toEqual(options.socialRisks)
+    expect(handleStateLatticePolicyWorkerRequest({ type: 'clear-cache' })).toEqual({ type: 'cache-cleared' })
+    expect(handleStateLatticePolicyWorkerRequest({ type: 'request-policy', request })).toEqual({
+      type: 'policy-pending',
+      id: request.id,
+    })
+  })
+
   it('handles worker protocol request, advancement, stats, and clear messages', () => {
     const state = createSimulationStateForScenario('spiral-known')
     const request = serializeStateLatticePolicyRequest(state.environment, testOptions())

@@ -3,7 +3,15 @@ import { distance, nearestWall, normAngle } from '../simulation/math'
 import type { ControlInput, Environment, PlannerParameters, RobotState, Vec2 } from '../simulation/types'
 
 export type StateLatticeAction = ControlInput & { id: string }
-export type StateLatticeSocialRisk = Vec2 & { id?: string; radius: number; weight?: number }
+export type StateLatticeSocialRisk = Vec2 & {
+  id?: string
+  radius: number
+  weight?: number
+  vx?: number
+  vy?: number
+  uncertainty?: number
+  uncertaintyGrowthRate?: number
+}
 
 export type StateLatticePolicyOptions = {
   resolution: number
@@ -315,7 +323,7 @@ function buildTransitionTable(
           nextState[transitionOffset] = toStateIndex(lattice, nx, ny, nh)
           stageCost[transitionOffset] =
             actionStageCost(action, lattice.actionDuration) +
-            socialRiskStageCost(stepped, socialRisks, robotRadius, lattice.actionDuration)
+            socialRiskTransitionCost(state, stepped, socialRisks, robotRadius, lattice.actionDuration)
         }
       }
     }
@@ -330,17 +338,57 @@ function actionStageCost(action: ControlInput, duration: number) {
   return distanceCost + turnCost + reverseCost
 }
 
+function socialRiskTransitionCost(
+  from: Vec2,
+  to: Vec2,
+  socialRisks: StateLatticeSocialRisk[],
+  robotRadius: number,
+  duration: number,
+) {
+  if (socialRisks.length === 0) return 0
+  const sampleFractions = [1 / 3, 2 / 3, 1]
+  const sampleDuration = duration / sampleFractions.length
+  return sampleFractions.reduce((total, fraction) => {
+    const point = interpolate(from, to, fraction)
+    const timeOffset = duration * fraction
+    return total + socialRiskStageCost(point, socialRisks, robotRadius, sampleDuration, timeOffset)
+  }, 0)
+}
+
 function socialRiskStageCost(
   point: Vec2,
   socialRisks: StateLatticeSocialRisk[],
   robotRadius: number,
   duration: number,
+  timeOffset: number,
 ) {
   return socialRisks.reduce((total, risk) => {
-    const preferredClearance = risk.radius + robotRadius + 0.55
-    const clearanceDeficit = Math.max(0, preferredClearance - distance(point, risk))
-    return total + (risk.weight ?? 1) * duration * clearanceDeficit * clearanceDeficit
+    const predicted = predictSocialRisk(risk, timeOffset)
+    const preferredClearance = predicted.radius + robotRadius + 0.55
+    const clearanceDeficit = Math.max(0, preferredClearance - distance(point, predicted))
+    return total + clampWeight(risk.weight ?? 1) * duration * clearanceDeficit * clearanceDeficit
   }, 0)
+}
+
+function predictSocialRisk(risk: StateLatticeSocialRisk, timeOffset: number) {
+  const uncertainty = Math.max(0, risk.uncertainty ?? 0)
+  const growth = Math.max(0, risk.uncertaintyGrowthRate ?? 0)
+  return {
+    x: risk.x + (risk.vx ?? 0) * timeOffset,
+    y: risk.y + (risk.vy ?? 0) * timeOffset,
+    radius: Math.min(20, Math.max(0, risk.radius) + uncertainty + growth * timeOffset),
+  }
+}
+
+function clampWeight(weight: number) {
+  return Math.min(100, Math.max(0, weight))
+}
+
+function interpolate(from: Vec2, to: Vec2, fraction: number): Vec2 {
+  return {
+    x: from.x + (to.x - from.x) * fraction,
+    y: from.y + (to.y - from.y) * fraction,
+  }
 }
 
 function isBlocked(point: Vec2, environment: Environment, robotRadius: number) {
@@ -370,7 +418,12 @@ function stateLatticePolicyCacheKey(environment: Environment, options: StateLatt
       .join('|')}`,
     `actions=${actions.map((action) => `${action.id}:${rounded(action.v)}:${rounded(action.omega)}`).join('|')}`,
     `social=${(options.socialRisks ?? [])
-      .map((risk) => `${risk.id ?? ''}:${pointKey(risk)}:${rounded(risk.radius)}:${rounded(risk.weight ?? 1)}`)
+      .map(
+        (risk) =>
+          `${risk.id ?? ''}:${pointKey(risk)}:${rounded(risk.radius)}:${rounded(risk.weight ?? 1)}:${rounded(
+            risk.vx ?? 0,
+          )}:${rounded(risk.vy ?? 0)}:${rounded(risk.uncertainty ?? 0)}:${rounded(risk.uncertaintyGrowthRate ?? 0)}`,
+      )
       .sort()
       .join('|')}`,
   ].join(';')

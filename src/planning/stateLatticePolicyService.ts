@@ -186,10 +186,31 @@ export function serializeStateLatticePolicyRequest(
   const serializableOptions: SerializableStateLatticePolicyOptions = {
     ...options,
     actions: options.actions?.map((action) => ({ ...action })),
-    socialRisks: options.socialRisks?.map((risk) => ({ ...risk })),
+    socialRisks: options.socialRisks?.map(normalizeSocialRiskForRequest).sort(compareSerializedSocialRisks),
   }
   const id = JSON.stringify({ environment: serializableEnvironment, options: serializableOptions })
   return { id, environment: serializableEnvironment, options: serializableOptions }
+}
+
+function normalizeSocialRiskForRequest(risk: NonNullable<StateLatticePolicyOptions['socialRisks']>[number]) {
+  return {
+    ...(risk.id === undefined ? {} : { id: risk.id }),
+    x: risk.x,
+    y: risk.y,
+    radius: risk.radius,
+    ...(risk.weight === undefined ? {} : { weight: risk.weight }),
+    ...(risk.vx === undefined ? {} : { vx: risk.vx }),
+    ...(risk.vy === undefined ? {} : { vy: risk.vy }),
+    ...(risk.uncertainty === undefined ? {} : { uncertainty: risk.uncertainty }),
+    ...(risk.uncertaintyGrowthRate === undefined ? {} : { uncertaintyGrowthRate: risk.uncertaintyGrowthRate }),
+  }
+}
+
+function compareSerializedSocialRisks(
+  a: ReturnType<typeof normalizeSocialRiskForRequest>,
+  b: ReturnType<typeof normalizeSocialRiskForRequest>,
+) {
+  return JSON.stringify(a).localeCompare(JSON.stringify(b))
 }
 
 export function handleStateLatticePolicyWorkerRequest(
