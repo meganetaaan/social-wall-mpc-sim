@@ -4,16 +4,12 @@ import type { ControlInput, PlannerMode, PlannerParameters, PlanningResult, Simu
 import { selectBeliefLatticeSource } from './beliefLatticeSource'
 import { rolloutCandidate } from './rollout'
 import { planSamplingMpc } from './samplingMpc'
-import {
-  advanceStateLatticePolicyBuild,
-  lookupStateLatticeAction,
-  requestStateLatticePolicy,
-} from './stateLatticeValueIteration'
+import { getStateLatticePolicyService } from './stateLatticePolicyService'
+import { lookupStateLatticeAction } from './stateLatticeValueIteration'
 
 export const defaultPlannerMode: PlannerMode = 'belief-mpc'
 
 const reactiveStopBuffer = 0.15
-const stateLatticeBuildWorkBudget = 4096
 
 export function planWithPolicy(args: {
   mode?: PlannerMode
@@ -56,11 +52,8 @@ function planStateLattice(state: SimulationState, parameters: PlannerParameters)
   const latticeSource = selectBeliefLatticeSource(state.environment, state.belief)
   if (latticeSource.status !== 'ready') return planBaseline(state, parameters, reactiveStopControl(state, parameters))
   const latticeEnvironment = latticeSource.environment
-  const lattice = requestStateLatticePolicy(latticeEnvironment, latticeOptions)
-  if (!lattice) {
-    advanceStateLatticePolicyBuild(latticeEnvironment, latticeOptions, stateLatticeBuildWorkBudget)
-    return planBaseline(state, parameters, reactiveStopControl(state, parameters))
-  }
+  const lattice = getStateLatticePolicyService().requestPolicy(latticeEnvironment, latticeOptions)
+  if (!lattice) return planBaseline(state, parameters, reactiveStopControl(state, parameters))
   const control = lookupStateLatticeAction(lattice, state.robot) ?? reactiveStopControl(state, parameters)
   const selected = rolloutCandidate({
     robot: state.robot,

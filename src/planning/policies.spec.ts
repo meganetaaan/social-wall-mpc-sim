@@ -1,15 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { defaultParameters } from '../simulation/environment'
 import { createSimulationStateForScenario } from '../simulation/scenarios'
 import { defaultPlannerMode, planWithPolicy } from './policies'
-import {
-  clearStateLatticePolicyCache,
-  getCachedStateLatticePolicy,
-  lookupStateLatticeAction,
-  stateLatticePolicyCacheStats,
-} from './stateLatticeValueIteration'
+import { getStateLatticePolicyService, resetStateLatticePolicyService } from './stateLatticePolicyService'
+import { getCachedStateLatticePolicy, lookupStateLatticeAction } from './stateLatticeValueIteration'
 
 describe('policy mode planner selection', () => {
+  beforeEach(() => {
+    resetStateLatticePolicyService()
+    getStateLatticePolicyService().clear()
+  })
+
   it('preserves belief MPC as the default policy mode', () => {
     expect(defaultPlannerMode).toBe('belief-mpc')
   })
@@ -48,8 +49,7 @@ describe('policy mode planner selection', () => {
     expect(result.bestControl.v).toBeGreaterThan(0)
   })
 
-  it('state-lattice mode starts a staged build and uses fallback on a cold cache', () => {
-    clearStateLatticePolicyCache()
+  it('state-lattice mode requests background policy work and uses fallback on a cold cache', () => {
     const state = createSimulationStateForScenario('spiral-known')
     const start = performance.now()
 
@@ -65,27 +65,32 @@ describe('policy mode planner selection', () => {
     expect(result.candidates).toHaveLength(1)
     expect(result.selected.controls).toHaveLength(defaultParameters.horizonSteps)
     expect(elapsedMs).toBeLessThan(1000)
-    expect(stateLatticePolicyCacheStats()).toEqual({ size: 0, pending: 1, hits: 0, misses: 1 })
+    expect(getStateLatticePolicyService().cacheStats()).toEqual({
+      ready: 0,
+      pending: 1,
+      hits: 0,
+      misses: 1,
+      backend: 'in-process',
+    })
   })
 
-  it('state-lattice mode completes a staged build across repeated calls and then hits cache', () => {
-    clearStateLatticePolicyCache()
+  it('state-lattice mode uses explicit service advancement and then hits cache', () => {
     const state = createSimulationStateForScenario('spiral-known')
 
-    for (let i = 0; i < 1000 && stateLatticePolicyCacheStats().size === 0; i += 1) {
-      planWithPolicy({ mode: 'state-lattice', state, parameters: defaultParameters, seed: 4 + i })
+    planWithPolicy({ mode: 'state-lattice', state, parameters: defaultParameters, seed: 4 })
+    for (let i = 0; i < 1000 && getStateLatticePolicyService().cacheStats().ready === 0; i += 1) {
+      getStateLatticePolicyService().advancePendingBuilds(4096)
     }
 
-    expect(stateLatticePolicyCacheStats().size).toBe(1)
+    expect(getStateLatticePolicyService().cacheStats().ready).toBe(1)
     const result = planWithPolicy({ mode: 'state-lattice', state, parameters: defaultParameters, seed: 5000 })
 
     expect(result.candidates).toHaveLength(1)
     expect(result.selected.controls).toHaveLength(1)
-    expect(stateLatticePolicyCacheStats()).toMatchObject({ size: 1, pending: 0, hits: 1 })
+    expect(getStateLatticePolicyService().cacheStats()).toMatchObject({ ready: 1, pending: 0, hits: 1 })
   })
 
   it('state-lattice mode uses a ready policy lookup with a single-control rollout', () => {
-    clearStateLatticePolicyCache()
     const state = createSimulationStateForScenario('spiral-known')
     const options = stateLatticeOptionsForState(state, defaultParameters.robotRadius)
     const policy = getCachedStateLatticePolicy(state.environment, options)
@@ -103,11 +108,16 @@ describe('policy mode planner selection', () => {
     expect(result.selected.controls).toHaveLength(1)
     expect(result.bestControl.v).toBeCloseTo(action?.v ?? Number.NaN)
     expect(result.bestControl.omega).toBeCloseTo(action?.omega ?? Number.NaN)
-    expect(stateLatticePolicyCacheStats()).toEqual({ size: 1, pending: 0, hits: 1, misses: 1 })
+    expect(getStateLatticePolicyService().cacheStats()).toEqual({
+      ready: 1,
+      pending: 0,
+      hits: 1,
+      misses: 1,
+      backend: 'in-process',
+    })
   })
 
   it('state-lattice mode falls back on an unknown sparse map without starting a misleading build', () => {
-    clearStateLatticePolicyCache()
     const state = createSimulationStateForScenario('spiral-unknown')
 
     const result = planWithPolicy({
@@ -119,11 +129,16 @@ describe('policy mode planner selection', () => {
 
     expect(result.candidates).toHaveLength(1)
     expect(result.selected.controls).toHaveLength(defaultParameters.horizonSteps)
-    expect(stateLatticePolicyCacheStats()).toEqual({ size: 0, pending: 0, hits: 0, misses: 0 })
+    expect(getStateLatticePolicyService().cacheStats()).toEqual({
+      ready: 0,
+      pending: 0,
+      hits: 0,
+      misses: 0,
+      backend: 'in-process',
+    })
   })
 
   it('state-lattice mode builds and caches from reliable anonymous map features', () => {
-    clearStateLatticePolicyCache()
     const state = createSimulationStateForScenario('spiral-unknown')
     const featureState = {
       ...state,
@@ -140,11 +155,12 @@ describe('policy mode planner selection', () => {
       },
     }
 
-    for (let i = 0; i < 1000 && stateLatticePolicyCacheStats().size === 0; i += 1) {
-      planWithPolicy({ mode: 'state-lattice', state: featureState, parameters: defaultParameters, seed: 4 + i })
+    planWithPolicy({ mode: 'state-lattice', state: featureState, parameters: defaultParameters, seed: 4 })
+    for (let i = 0; i < 1000 && getStateLatticePolicyService().cacheStats().ready === 0; i += 1) {
+      getStateLatticePolicyService().advancePendingBuilds(4096)
     }
 
-    expect(stateLatticePolicyCacheStats().size).toBe(1)
+    expect(getStateLatticePolicyService().cacheStats().ready).toBe(1)
     const result = planWithPolicy({
       mode: 'state-lattice',
       state: featureState,
@@ -154,7 +170,7 @@ describe('policy mode planner selection', () => {
 
     expect(result.candidates).toHaveLength(1)
     expect(result.selected.controls).toHaveLength(1)
-    expect(stateLatticePolicyCacheStats()).toMatchObject({ size: 1, pending: 0, hits: 1 })
+    expect(getStateLatticePolicyService().cacheStats()).toMatchObject({ ready: 1, pending: 0, hits: 1 })
   })
 })
 

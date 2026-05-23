@@ -5,9 +5,12 @@ The experimental `state-lattice` planner now builds an orientation-aware value a
 a single-control rollout for UI consistency with the existing planner result shape. The lattice policy
 is cached by deterministic environment geometry, goal, grid, action primitive, iteration, and social-risk
 parameters so unchanged known-map calls reuse the precomputed field instead of rebuilding every frame.
-Cold `state-lattice` planner calls now request a staged policy build and return a cheap safe fallback while
-bounded value-iteration work advances in later calls. Once the staged build completes, the cached policy is
-used for single-control policy lookup instead of rebuilding synchronously inside the simulation step.
+Cold `state-lattice` planner calls now request policy work through a small service boundary and return a
+cheap safe fallback while bounded value-iteration work advances outside the planner call. Once the staged
+build completes, the cached policy is used for single-control policy lookup instead of rebuilding
+synchronously inside the simulation step. The same service exposes a worker-safe request/response protocol
+and worker handler so policy construction can be hosted off the UI thread; the default test/runtime adapter
+remains deterministic and in-process until a browser worker instance is explicitly installed.
 
 The runtime lattice source now goes through belief-derived map selection before policy construction. Known-map
 beliefs with broad high-confidence true-ID coverage continue to use the full scenario environment. Unknown-map
@@ -28,7 +31,9 @@ Remaining gaps versus Ueda et al. are substantial:
   risk centers for the cached policy key.
 - Belief-derived lattice maps are still hard geometry once admitted; uncertainty is only used for source
   gating, not represented inside the value table.
-- The browser implementation is CPU TypeScript and should move policy construction to a Web Worker, WASM,
-  or GPU path before using finer grids or larger maps interactively.
+- The default runtime adapter is still in-process; a browser worker protocol/handler exists, but UI bootstrap
+  does not yet install a real Worker by default.
+- The browser implementation is CPU TypeScript and should move heavier policy construction to the Worker
+  adapter, WASM, or GPU path before using finer grids or larger maps interactively.
 - The spiral known-map regression now covers a long policy-driven route through multiple bends, but exact
   center-goal convergence from the scenario start remains a tuning/primitive-resolution gap.
