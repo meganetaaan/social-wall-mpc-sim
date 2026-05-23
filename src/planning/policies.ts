@@ -3,6 +3,7 @@ import { distance, nearestWall, normAngle, wallTangentAngle } from '../simulatio
 import type { ControlInput, PlannerMode, PlannerParameters, PlanningResult, SimulationState } from '../simulation/types'
 import { rolloutCandidate } from './rollout'
 import { planSamplingMpc } from './samplingMpc'
+import { createStateLatticePolicy, lookupStateLatticeAction } from './stateLatticeValueIteration'
 
 export const defaultPlannerMode: PlannerMode = 'belief-mpc'
 
@@ -16,9 +17,31 @@ export function planWithPolicy(args: {
 }): PlanningResult {
   const mode = args.mode ?? defaultPlannerMode
   if (mode === 'belief-mpc') return planSamplingMpc(args)
+  if (mode === 'state-lattice') return planStateLattice(args.state, args.parameters)
   if (mode === 'reactive-stop')
     return planBaseline(args.state, args.parameters, reactiveStopControl(args.state, args.parameters))
   return planBaseline(args.state, args.parameters, wallOnlyControl(args.state, args.parameters), true)
+}
+
+function planStateLattice(state: SimulationState, parameters: PlannerParameters): PlanningResult {
+  const lattice = createStateLatticePolicy(state.environment, {
+    resolution: 0.4,
+    headingBins: 16,
+    robotRadius: parameters.robotRadius,
+    discount: 0.98,
+    iterations: 180,
+  })
+  const control = lookupStateLatticeAction(lattice, state.robot) ?? { v: 0, omega: 0 }
+  const selected = rolloutCandidate({
+    robot: state.robot,
+    humans: state.humans,
+    environment: state.environment,
+    belief: state.belief,
+    controls: [clampControl(control, parameters)],
+    previousControl: state.previousControl,
+    parameters,
+  })
+  return { candidates: [selected], selected, bestControl: selected.controls[0] ?? control }
 }
 
 function planBaseline(

@@ -41,4 +41,19 @@ describe('policy mode planner selection', () => {
 
     expect(result.bestControl.v).toBeGreaterThan(0)
   })
+
+  it('state-lattice mode uses an orientation-aware policy lookup instead of sampling MPC', () => {
+    const state = createSimulationStateForScenario('spiral-known')
+
+    const result = planWithPolicy({
+      mode: 'state-lattice',
+      state,
+      parameters: defaultParameters,
+      seed: 4,
+    })
+
+    expect(result.bestControl.v).toBeGreaterThan(0)
+    expect(result.candidates).toHaveLength(1)
+    expect(result.selected.controls).toHaveLength(1)
+  })
 })

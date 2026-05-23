@@ -156,7 +156,7 @@ export type PlanningResult = {
   selected: CandidateRollout
   bestControl: ControlInput
 }
-export type PlannerMode = 'belief-mpc' | 'wall-only' | 'reactive-stop'
+export type PlannerMode = 'belief-mpc' | 'wall-only' | 'reactive-stop' | 'state-lattice'
 export type SimulationMetrics = {
   elapsedTime: number
   meanWallDistanceError: number

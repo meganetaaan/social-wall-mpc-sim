@@ -88,6 +88,7 @@ export default function App() {
                 onChange={(event) => setPlannerMode(event.currentTarget.value as PlannerMode)}
               >
                 <option value="belief-mpc">belief-mpc</option>
+                <option value="state-lattice">state-lattice value policy</option>
                 <option value="wall-only">wall-only baseline</option>
                 <option value="reactive-stop">reactive-stop hard-switch baseline</option>
               </select>
