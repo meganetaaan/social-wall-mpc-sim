@@ -40,13 +40,24 @@ temporal radius uncertainty; transition cost samples each primitive and evaluate
 at that sample's time offset. This lets the cached `V(x, y, theta)` policy distinguish a moving human that
 will cross a future primitive path from the same human frozen at the current pose.
 
+Ready policy lookup now has a small pose-belief bridge. When `belief.pose` has usable non-tiny covariance,
+`state-lattice` samples a deterministic set of sigma points around the pose mean, looks up the table policy
+and value at each sample, and selects the action with the strongest sigma-point consensus with value-based
+tie breaking. Degenerate or unavailable pose covariance keeps the previous direct mean/current-pose lookup.
+This is only an expected policy-selection bridge over the existing `V(x, y, theta)` table; it is not full
+belief-space value iteration.
+
 Remaining gaps versus Ueda et al. are substantial:
 
 - The table is still `V(x, y, theta)`, not a belief-space `V(b)` over pose/map/object distributions.
+- Pose covariance affects only the final action lookup over deterministic sigma points, not the dynamic
+  programming backup itself.
 - Dynamic human motion is represented only as deterministic linear risk-center prediction over each action
   primitive, not as a full belief distribution over future human trajectories.
 - Belief-derived lattice maps are still hard geometry once admitted; uncertainty is only used for source
   gating, not represented inside the value table.
+- Map and object uncertainty are not branched through future observations; there is no observation tree or
+  belief transition inside the lattice value iteration.
 - Browser bootstrap installs a Worker-backed service when available, but non-browser runs and Worker
   construction failures still use the in-process service.
 - The browser implementation is CPU TypeScript and should move heavier policy construction to the Worker

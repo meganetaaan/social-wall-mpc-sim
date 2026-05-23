@@ -2,15 +2,18 @@ import { describe, expect, it } from 'vitest'
 import { stepRobotInEnvironment } from '../simulation/dynamics'
 import { defaultParameters } from '../simulation/environment'
 import { createSimulationStateForScenario } from '../simulation/scenarios'
+import type { PoseCovariance } from '../simulation/types'
 import {
   advanceStateLatticePolicyBuild,
   clearStateLatticePolicyCache,
   createStateLatticePolicy,
   getCachedStateLatticePolicy,
   lookupStateLatticeAction,
+  lookupStateLatticeActionForBelief,
   lookupStateLatticeValue,
   requestStateLatticePolicy,
   rolloutStateLatticePolicy,
+  type StateLatticePolicy,
   stateLatticePolicyCacheStats,
 } from './stateLatticeValueIteration'
 
@@ -183,4 +186,60 @@ describe('state-lattice value iteration', () => {
     expect(lookupStateLatticeAction(nonCrossing, probe)?.id).toBe('forward')
     expect(lookupStateLatticeAction(crossing, probe)?.id).not.toBe('forward')
   })
+
+  it('falls back to mean-pose lookup for tiny pose covariance', () => {
+    const policy = testConsensusPolicy()
+    const robot = { x: 0, y: 0, theta: 0 }
+    const belief = {
+      pose: {
+        mean: robot,
+        covariance: [
+          [1e-12, 0, 0],
+          [0, 1e-12, 0],
+          [0, 0, 1e-12],
+        ] satisfies PoseCovariance,
+      },
+    }
+
+    expect(lookupStateLatticeAction(policy, robot)?.id).toBe('mean-action')
+    expect(lookupStateLatticeActionForBelief(policy, robot, belief)?.id).toBe('mean-action')
+  })
+
+  it('uses sigma-point consensus when broad pose belief crosses nearby policy cells', () => {
+    const policy = testConsensusPolicy()
+    const robot = { x: 0, y: 0, theta: 0 }
+    const belief = {
+      pose: {
+        mean: robot,
+        covariance: [
+          [1, 0, 0],
+          [0, 1, 0],
+          [0, 0, 1e-12],
+        ] satisfies PoseCovariance,
+      },
+    }
+
+    expect(lookupStateLatticeAction(policy, robot)?.id).toBe('mean-action')
+    expect(lookupStateLatticeActionForBelief(policy, robot, belief)?.id).toBe('consensus-action')
+  })
 })
+
+function testConsensusPolicy(): StateLatticePolicy {
+  const values = new Float64Array([2, 2, 2, 2, 10, 2, 2, 2, 2])
+  const policy = new Int16Array([1, 1, 1, 1, 0, 1, 1, 1, 1])
+  return {
+    origin: { x: -1, y: -1 },
+    width: 3,
+    height: 3,
+    resolution: 1,
+    headingBins: 1,
+    actions: [
+      { id: 'mean-action', v: 0.1, omega: 0 },
+      { id: 'consensus-action', v: 0.2, omega: 0.1 },
+    ],
+    values,
+    policy,
+    unreachableCost: 1000,
+    actionDuration: 1,
+  }
+}

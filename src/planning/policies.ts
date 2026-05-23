@@ -5,7 +5,7 @@ import { selectBeliefLatticeSource } from './beliefLatticeSource'
 import { rolloutCandidate } from './rollout'
 import { planSamplingMpc } from './samplingMpc'
 import { getStateLatticePolicyService } from './stateLatticePolicyService'
-import { lookupStateLatticeAction } from './stateLatticeValueIteration'
+import { lookupStateLatticeActionForBelief } from './stateLatticeValueIteration'
 
 export const defaultPlannerMode: PlannerMode = 'belief-mpc'
 
@@ -58,7 +58,8 @@ function planStateLattice(state: SimulationState, parameters: PlannerParameters)
   const latticeEnvironment = latticeSource.environment
   const lattice = getStateLatticePolicyService().requestPolicy(latticeEnvironment, latticeOptions)
   if (!lattice) return planBaseline(state, parameters, reactiveStopControl(state, parameters))
-  const control = lookupStateLatticeAction(lattice, state.robot) ?? reactiveStopControl(state, parameters)
+  const control =
+    lookupStateLatticeActionForBelief(lattice, state.robot, state.belief) ?? reactiveStopControl(state, parameters)
   const selected = rolloutCandidate({
     robot: state.robot,
     humans: state.humans,

@@ -1,6 +1,6 @@
 import { stepRobotInEnvironment } from '../simulation/dynamics'
 import { distance, nearestWall, normAngle } from '../simulation/math'
-import type { ControlInput, Environment, PlannerParameters, RobotState, Vec2 } from '../simulation/types'
+import type { BeliefState, ControlInput, Environment, PlannerParameters, RobotState, Vec2 } from '../simulation/types'
 
 export type StateLatticeAction = ControlInput & { id: string }
 export type StateLatticeSocialRisk = Vec2 & {
@@ -265,6 +265,70 @@ export function lookupStateLatticeAction(lattice: StateLatticePolicy, state: Rob
   return actionIndex >= 0 ? lattice.actions[actionIndex] : null
 }
 
+export function lookupStateLatticeActionForBelief(
+  lattice: StateLatticePolicy,
+  robot: RobotState,
+  belief?: Pick<BeliefState, 'pose'> | null,
+): StateLatticeAction | null {
+  const pose = belief?.pose
+  if (!pose || !isUsableRobotState(pose.mean)) return lookupStateLatticeAction(lattice, robot)
+
+  const sigmaX = sigmaFromVariance(pose.covariance?.[0]?.[0])
+  const sigmaY = sigmaFromVariance(pose.covariance?.[1]?.[1])
+  const sigmaTheta = sigmaFromVariance(pose.covariance?.[2]?.[2])
+  if (sigmaX === null || sigmaY === null || sigmaTheta === null) return lookupStateLatticeAction(lattice, robot)
+
+  const headingResolution = (Math.PI * 2) / lattice.headingBins
+  if (
+    sigmaX <= lattice.resolution * 1e-3 &&
+    sigmaY <= lattice.resolution * 1e-3 &&
+    sigmaTheta <= headingResolution * 1e-3
+  ) {
+    return lookupStateLatticeAction(lattice, robot)
+  }
+
+  const votes = new Map<number, { actionIndex: number; count: number; totalValue: number; bestValue: number }>()
+  for (const sample of stateLatticePoseSigmaPoints(pose.mean, sigmaX, sigmaY, sigmaTheta)) {
+    const lookup = lookupStateLatticePolicySample(lattice, sample)
+    if (!lookup) continue
+    const previous = votes.get(lookup.actionIndex)
+    if (previous) {
+      previous.count += 1
+      previous.totalValue += lookup.value
+      previous.bestValue = Math.min(previous.bestValue, lookup.value)
+    } else {
+      votes.set(lookup.actionIndex, {
+        actionIndex: lookup.actionIndex,
+        count: 1,
+        totalValue: lookup.value,
+        bestValue: lookup.value,
+      })
+    }
+  }
+
+  let best: { actionIndex: number; count: number; totalValue: number; bestValue: number } | null = null
+  for (const candidate of votes.values()) {
+    const candidateMeanValue = candidate.totalValue / candidate.count
+    const bestMeanValue = best ? best.totalValue / best.count : Number.POSITIVE_INFINITY
+    if (
+      !best ||
+      candidate.count > best.count ||
+      (candidate.count === best.count && candidateMeanValue < bestMeanValue) ||
+      (candidate.count === best.count &&
+        candidateMeanValue === bestMeanValue &&
+        candidate.bestValue < best.bestValue) ||
+      (candidate.count === best.count &&
+        candidateMeanValue === bestMeanValue &&
+        candidate.bestValue === best.bestValue &&
+        candidate.actionIndex < best.actionIndex)
+    ) {
+      best = candidate
+    }
+  }
+
+  return best ? lattice.actions[best.actionIndex] : lookupStateLatticeAction(lattice, robot)
+}
+
 export function lookupStateLatticeValue(lattice: StateLatticePolicy, state: RobotState): number {
   const x = Math.round((state.x - lattice.origin.x) / lattice.resolution)
   const y = Math.round((state.y - lattice.origin.y) / lattice.resolution)
@@ -454,6 +518,16 @@ function toStateIndex(
   return (h * lattice.height + y) * lattice.width + x
 }
 
+function lookupStateLatticePolicySample(lattice: StateLatticePolicy, state: RobotState) {
+  const x = Math.round((state.x - lattice.origin.x) / lattice.resolution)
+  const y = Math.round((state.y - lattice.origin.y) / lattice.resolution)
+  if (x < 0 || y < 0 || x >= lattice.width || y >= lattice.height) return null
+  const h = headingBin(state.theta, lattice.headingBins)
+  const actionIndex = nearestPolicyActionIndex(lattice, x, y, h)
+  if (actionIndex < 0) return null
+  return { actionIndex, value: lattice.values[toStateIndex(lattice, x, y, h)] }
+}
+
 function nearestPolicyActionIndex(lattice: StateLatticePolicy, x: number, y: number, h: number) {
   const exact = lattice.policy[toStateIndex(lattice, x, y, h)]
   if (exact >= 0) return exact
@@ -490,4 +564,38 @@ function headingBin(theta: number, headingBins: number) {
   const wrapped = normAngle(theta)
   const positive = wrapped < 0 ? wrapped + Math.PI * 2 : wrapped
   return Math.round((positive / (Math.PI * 2)) * headingBins) % headingBins
+}
+
+function stateLatticePoseSigmaPoints(
+  mean: RobotState,
+  sigmaX: number,
+  sigmaY: number,
+  sigmaTheta: number,
+): RobotState[] {
+  return [
+    mean,
+    { ...mean, x: mean.x + sigmaX * 0.5 },
+    { ...mean, x: mean.x - sigmaX * 0.5 },
+    { ...mean, y: mean.y + sigmaY * 0.5 },
+    { ...mean, y: mean.y - sigmaY * 0.5 },
+    { ...mean, x: mean.x + sigmaX },
+    { ...mean, x: mean.x - sigmaX },
+    { ...mean, y: mean.y + sigmaY },
+    { ...mean, y: mean.y - sigmaY },
+    { ...mean, x: mean.x + sigmaX, y: mean.y + sigmaY },
+    { ...mean, x: mean.x + sigmaX, y: mean.y - sigmaY },
+    { ...mean, x: mean.x - sigmaX, y: mean.y + sigmaY },
+    { ...mean, x: mean.x - sigmaX, y: mean.y - sigmaY },
+    { ...mean, theta: normAngle(mean.theta + sigmaTheta) },
+    { ...mean, theta: normAngle(mean.theta - sigmaTheta) },
+  ]
+}
+
+function sigmaFromVariance(value: number | undefined): number | null {
+  if (value === undefined || !Number.isFinite(value)) return null
+  return Math.sqrt(Math.max(0, value))
+}
+
+function isUsableRobotState(state: RobotState | undefined) {
+  return !!state && Number.isFinite(state.x) && Number.isFinite(state.y) && Number.isFinite(state.theta)
 }

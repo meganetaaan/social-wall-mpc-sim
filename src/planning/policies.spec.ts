@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { defaultParameters } from '../simulation/environment'
 import { createSimulationStateForScenario } from '../simulation/scenarios'
+import type { PoseCovariance } from '../simulation/types'
 import { defaultPlannerMode, planWithPolicy } from './policies'
 import {
   getStateLatticePolicyService,
@@ -11,6 +12,8 @@ import {
 import {
   getCachedStateLatticePolicy,
   lookupStateLatticeAction,
+  lookupStateLatticeActionForBelief,
+  type StateLatticePolicy,
   type StateLatticePolicyOptions,
 } from './stateLatticeValueIteration'
 
@@ -104,7 +107,7 @@ describe('policy mode planner selection', () => {
     const state = createSimulationStateForScenario('spiral-known')
     const options = stateLatticeOptionsForState(state, defaultParameters.robotRadius)
     const policy = getCachedStateLatticePolicy(state.environment, options)
-    const action = lookupStateLatticeAction(policy, state.robot)
+    const action = lookupStateLatticeActionForBelief(policy, state.robot, state.belief)
 
     const result = planWithPolicy({
       mode: 'state-lattice',
@@ -126,6 +129,40 @@ describe('policy mode planner selection', () => {
       backend: 'in-process',
       lastError: null,
     })
+  })
+
+  it('state-lattice mode uses belief-aware lookup when a ready policy is available', () => {
+    const state = createSimulationStateForScenario('spiral-known')
+    const beliefAwarePolicy = testConsensusPolicyAt(state.robot)
+    setStateLatticePolicyService(new ReadyPolicyService(beliefAwarePolicy))
+    const broadBeliefState = {
+      ...state,
+      belief: {
+        ...state.belief,
+        pose: {
+          mean: state.robot,
+          covariance: [
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1e-12],
+          ] satisfies PoseCovariance,
+        },
+      },
+    }
+
+    expect(lookupStateLatticeAction(beliefAwarePolicy, state.robot)?.id).toBe('mean-action')
+
+    const result = planWithPolicy({
+      mode: 'state-lattice',
+      state: broadBeliefState,
+      parameters: defaultParameters,
+      seed: 4,
+    })
+
+    expect(result.candidates).toHaveLength(1)
+    expect(result.selected.controls).toHaveLength(1)
+    expect(result.bestControl.v).toBeCloseTo(0.2)
+    expect(result.bestControl.omega).toBeCloseTo(0.1)
   })
 
   it('state-lattice mode falls back on an unknown sparse map without starting a misleading build', () => {
@@ -258,5 +295,45 @@ class CapturingPolicyService implements StateLatticePolicyService {
 
   clear() {
     this.lastOptions = null
+  }
+}
+
+class ReadyPolicyService implements StateLatticePolicyService {
+  private readonly policy: StateLatticePolicy
+
+  constructor(policy: StateLatticePolicy) {
+    this.policy = policy
+  }
+
+  requestPolicy() {
+    return this.policy
+  }
+
+  advancePendingBuilds() {
+    return []
+  }
+
+  cacheStats() {
+    return { ready: 1, pending: 0, hits: 0, misses: 0, backend: 'in-process' as const, lastError: null }
+  }
+
+  clear() {}
+}
+
+function testConsensusPolicyAt(robot: { x: number; y: number }): StateLatticePolicy {
+  return {
+    origin: { x: robot.x - 1, y: robot.y - 1 },
+    width: 3,
+    height: 3,
+    resolution: 1,
+    headingBins: 1,
+    actions: [
+      { id: 'mean-action', v: 0.1, omega: 0 },
+      { id: 'consensus-action', v: 0.2, omega: 0.1 },
+    ],
+    values: new Float64Array([2, 2, 2, 2, 10, 2, 2, 2, 2]),
+    policy: new Int16Array([1, 1, 1, 1, 0, 1, 1, 1, 1]),
+    unreachableCost: 1000,
+    actionDuration: 1,
   }
 }
